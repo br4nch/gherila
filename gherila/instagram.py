@@ -1,4 +1,5 @@
 from .http import State
+from typing import Optional
 from .models import (
   InstagramUser,
   InstagramStory
@@ -31,9 +32,10 @@ class Instagram:
       f"https://i.instagram.com/api/v1/users/{username}/usernameinfo",
       headers=self.headers,
     )
+
     return InstagramUser(**data.user)
 
-  async def get_story(self: "Instagram", username: str):
+  async def get_story(self: "Instagram", username: str, amount: Optional[int] = None):
     """
     Get the stories of a user by username.
 
@@ -41,6 +43,8 @@ class Instagram:
     ----------
     username: :class:`str`
       The username of the user to fetch the stories.
+    amount: Optional[:class:`int`]
+      The amount of stories to fetch. If the amount is not given all stories will be fetched.
     
     Returns
     -------
@@ -69,4 +73,8 @@ class Instagram:
         )[-1].url
 
       stories.append(story)
+
+    if amount:
+      stories = stories[:amount]
+
     return [InstagramStory(**s) for s in stories]
