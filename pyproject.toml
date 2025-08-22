@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gherila"
+authors = [{ name="s4nica" }]
+description = "An async package destioned to fetch information from different platforms"
+readme = "README.md"
+requires-python = ">=3.8.0"
+classifiers = [
+  'Programming Language :: Python :: 3.8',
+  'Programming Language :: Python :: 3.9',
+  'Programming Language :: Python :: 3.10',
+  'Programming Language :: Python :: 3.11',
+  'License :: OSI Approved :: MIT License',
+  'Operating System :: OS Independent',
+]
+license = { file = "LICENSE" }
+dynamic = ["version", "dependencies"]
+
+[project.urls]
+Issues = "https://github.com/br4nch/gherila/issues"
