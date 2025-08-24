@@ -1,5 +1,6 @@
 from .http import State
 from typing import Optional
+from .exceptions import Error
 from .models import (
   InstagramUser,
   InstagramStory
@@ -32,6 +33,9 @@ class Instagram:
       f"https://i.instagram.com/api/v1/users/{username}/usernameinfo",
       headers=self.headers,
     )
+
+    if not data.user:
+      raise Error(f"Can't find an user with the username `{username}`.")
 
     return InstagramUser(**data.user)
 

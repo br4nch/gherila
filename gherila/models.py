@@ -9,6 +9,25 @@ from pydantic import (
   HttpUrl
 )
 
+class TikTokBioLinks(BaseModel):
+  link: str
+
+class TikTokStats(BaseModel):
+  followingCount: int
+  followerCount: int
+  heartCount: int
+  videoCount: int
+
+class TikTokUser(BaseModel):
+  id: int
+  uniqueId: str
+  nickname: str
+  signature: str
+  avatarMedium: HttpUrl
+  verified: bool
+  privateAccount: bool
+  stats: TikTokStats
+
 class BioLinks(BaseModel):
   link_id: int
   url: str
