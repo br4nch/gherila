@@ -9,6 +9,10 @@ from pydantic import (
   HttpUrl
 )
 
+class BraveImages(BaseModel):
+  query: str
+  images: List[HttpUrl]
+
 class TikTokBioLinks(BaseModel):
   link: str
 
