@@ -70,3 +70,12 @@ class InstagramStory(BaseModel):
   video_url: Optional[HttpUrl] = None
   video_duration: Optional[float] = 0.0
   thumnail_url: Optional[HttpUrl] = None
+
+class InstagramHighlight(BaseModel):
+  id: int
+  title: str
+  created_at: datetime
+  is_pinned_highlight: bool
+  media_count: int
+  cover_media: str
+  user: InstagramStoryUser

@@ -3,7 +3,8 @@ from typing import Optional
 from .exceptions import Error
 from .models import (
   InstagramUser,
-  InstagramStory
+  InstagramStory,
+  InstagramHighlight
 )
 
 class Instagram:
@@ -82,3 +83,37 @@ class Instagram:
       stories = stories[:amount]
 
     return [InstagramStory(**s) for s in stories]
+
+  async def get_highlights(self: "Instagram", username: str, amount: Optional[int] = None):
+    """
+    Get the highlights of a user by username.
+
+    Parameters
+    ----------
+    username: :class:`str`
+      The username of the user to fetch the highlights.
+    amount: Optional[:class:`int`]
+      The amount of highlights to fetch. If the amount is not given all highlights will be fetched.
+    
+    Returns
+    -------
+    :class:`List[InstagramHighlight]`
+      A list of InstagramHighlight objects with the user highlights.
+    """
+    user_id = (await self.get_user(username)).pk
+    data = await self.session.request(
+      "GET",
+      f"https://i.instagram.com/api/v1/highlights/{user_id}/highlights_tray/",
+      headers=self.headers,
+    )
+    highlights = []
+    for highlight in data.get("tray", []):
+      highlight.id = highlight.id.split(":")[1]
+      highlight.cover_media = highlight.cover_media.cropped_image_version.url
+
+      highlights.append(highlight)
+
+    if amount:
+      highlights = highlights[:amount]
+
+    return [InstagramHighlight(**h) for h in highlights]
