@@ -79,3 +79,18 @@ class InstagramHighlight(BaseModel):
   media_count: int
   cover_media: str
   user: InstagramStoryUser
+
+class InstagramMedia(BaseModel):
+  id: int
+  code: str
+  media_type: int
+  taken_at: datetime
+  like_count: int
+  comment_count: int
+  play_count: Optional[int] = None
+  title: Optional[str] = None
+  user: InstagramStoryUser
+  image_urls: Optional[List[HttpUrl]] = None
+  thumbnail_url: Optional[HttpUrl] = None
+  video_url: Optional[HttpUrl] = None
+  video_duration: Optional[float] = 0.0

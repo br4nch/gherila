@@ -1,10 +1,13 @@
+from urllib.parse import urlparse
+
 from .http import State
 from typing import Optional
 from .exceptions import Error
 from .models import (
   InstagramUser,
   InstagramStory,
-  InstagramHighlight
+  InstagramHighlight,
+  InstagramMedia
 )
 
 class Instagram:
@@ -117,3 +120,52 @@ class Instagram:
       highlights = highlights[:amount]
 
     return [InstagramHighlight(**h) for h in highlights]
+
+  async def get_post(self: "Instagram", url: str, amount: Optional[int] = None):
+    """
+    Get the info about a post by url.
+
+    Parameters
+    ----------
+    url: :class:`str`
+      The url of the post to fetch it.
+    amount: Optional[:class:`int`]
+      The amount of images/videos to fetch. If the amount is not given all will be fetched.
+    
+    Returns
+    -------
+    :class:`List[InstagramMedia]`
+      A list of InstagramMedia objects with the post images/videos.
+    """
+    char = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+    code = [p for p in (urlparse(url).path).split("/") if p][1]
+    media_id = sum(char.index(x) * (len(char) ** i) for i, x in enumerate(reversed(code)))
+
+    data = await self.session.request(
+      "GET",
+      f"https://i.instagram.com/api/v1/media/{media_id}/info",
+      headers=self.headers,
+    )
+
+    medias = []
+    for media in data.get("items", []):
+      if "video_versions" in media:
+        media.video_url = sorted(
+          media.video_versions,
+          key=lambda x: x.height * x.width,
+        )[-1].url
+
+      if "image_versions2" in media:
+        urls = [media_url.url for media_url in media.image_versions2.candidates]
+        if amount:
+          urls = urls[:amount]
+
+        media.image_urls = urls
+        media.thumbnail_url = sorted(
+          media.image_versions2.candidates,
+          key=lambda x: x.height * x.width,
+        )[-1].url
+
+      medias.append(media)
+
+    return [InstagramMedia(**m) for m in medias]
