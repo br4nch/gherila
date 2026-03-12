@@ -9,6 +9,46 @@ from pydantic import (
   HttpUrl
 )
 
+class GitHubUser(BaseModel):
+  id: int
+  login: str
+  avatar_url: HttpUrl
+  url: str
+  name: str
+  type: str
+  company: Optional[str] = None
+  location: Optional[str] = None
+  email: Optional[str] = None
+  bio: Optional[str] = None
+  public_repos: int
+  followers: int
+  following: int
+  created_at: datetime
+
+class GitHubRepoOwner(BaseModel):
+  login: str
+  id: int
+  avatar_url: HttpUrl
+  html_url: HttpUrl
+  type: str
+
+class GitHubRepo(BaseModel):
+  id: int
+  name: str
+  private: bool
+  owner: GitHubRepoOwner
+  description: Optional[str] = None
+  fork: bool
+  url: str
+  created_at: datetime
+  updated_at: datetime
+  stargazers_count: int
+  watchers_count: int
+  language: str
+  archived: bool
+  topics: List[str] = []
+  forks: int
+
 class BraveImages(BaseModel):
   query: str
   images: List[HttpUrl]
