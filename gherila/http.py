@@ -1,6 +1,6 @@
 from munch import DefaultMunch
 from typing import Any
-from aiohttp import ClientSession
+from aiohttp import ClientSession, CookieJar
 
 from .exceptions import Error
 
@@ -19,15 +19,26 @@ class State:
         'text/html',
       ):
         return await response.text()
-      
+
       elif response.content_type in (
-        'application/json'
+        (
+          'image/',
+          'video/',
+          'audio/'
+        )
+      ):
+        return await response.read()
+
+      elif response.content_type in (
+        'application/json',
+        'application/octet-stream',
+        'text/javascript'
       ):
         try:
           data = await response.json(content_type=None)
         except Exception as e:
           raise Error(f"Could not parse JSON -> {e}")
-        
+
         munch = DefaultMunch.fromDict(data)
         return munch
       return response

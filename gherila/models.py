@@ -72,6 +72,21 @@ class TikTokUser(BaseModel):
   privateAccount: bool
   stats: TikTokStats
 
+class TikTokVideoStats(BaseModel):
+  diggCount: int
+  shareCount: int
+  commentCount: int
+  playCount: int
+  collectCount: int
+
+class TikTokVideo(BaseModel):
+  id: int
+  desc: str
+  createTime: datetime
+  stats: TikTokVideoStats
+  author: TikTokUser
+  url: str
+
 class BioLinks(BaseModel):
   link_id: int
   url: str

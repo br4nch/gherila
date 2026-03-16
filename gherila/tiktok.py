@@ -6,12 +6,17 @@ from .http import State
 from .exceptions import Error
 from .models import (
   TikTokUser,
-  TikTokStats
+  TikTokStats,
+  TikTokVideo
 )
 
 class TikTok:
   def __init__(self: "TikTok"):
     self.session = State()
+    self.headers = {
+      "Referer": "https://www.tiktok.com/",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
   
   async def get_user(self: "TikTok", username: str):
     """
@@ -30,6 +35,7 @@ class TikTok:
     data = await self.session.request(
       "GET",
       f"https://www.tiktok.com/@{username}",
+      headers=self.headers,
     )
     result = search(r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>', data)
     raw = loads(result.group(1))["__DEFAULT_SCOPE__"]["webapp.user-detail"]
@@ -41,3 +47,29 @@ class TikTok:
     stats = TikTokStats(**loaded.userInfo.stats)
     loaded.userInfo.user.stats = stats
     return TikTokUser(**loaded.userInfo.user)
+
+  async def get_video(self: "TikTok", url: str):
+    """
+    Get video data based on the given url.
+
+    Parameters
+    ----------
+    url: :class:`str`
+      The tiktok video url.
+    """
+    data = await self.session.request(
+      "GET",
+      url,
+      headers=self.headers,
+    )
+    result = search(r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>', data)
+    loaded = munchify(loads(result.group(1))["__DEFAULT_SCOPE__"]["webapp.video-detail"])
+
+    if loaded.statusCode == 10204:
+      raise Error(f"This is not a valid tiktok url.")
+
+    r = loaded.itemInfo.itemStruct
+    user = await self.get_user(r.author.uniqueId)
+    r.author = user
+    r.url = r.video.playAddr
+    return TikTokVideo(**r)
