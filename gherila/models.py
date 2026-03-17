@@ -63,6 +63,15 @@ class GitHubRepo(BaseModel):
   topics: List[str] = []
   forks: int
 
+class BraveResult(BaseModel):
+  url: str
+  title: str
+  description: str
+
+class BraveSearch(BaseModel):
+  query: str
+  results: List[BraveResult]
+
 class BraveImages(BaseModel):
   query: str
   images: List[HttpUrl]
