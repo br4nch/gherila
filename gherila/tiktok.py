@@ -26,11 +26,11 @@ class TikTok:
     ----------
     username: :class:`str`
       The username of the user to fetch the info.
-    
+
     Returns
     -------
     :class:`TikTokUser`
-      A TikTokUser object with the user info.
+      A TikTokUser object with the user information.
     """
     data = await self.session.request(
       "GET",
@@ -56,6 +56,11 @@ class TikTok:
     ----------
     url: :class:`str`
       The tiktok video url.
+
+    Returns
+    -------
+    :class:`TikTokVideo`
+      A TikTokVideo object containing the video information.
     """
     data = await self.session.request(
       "GET",

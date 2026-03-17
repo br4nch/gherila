@@ -9,6 +9,20 @@ from pydantic import (
   HttpUrl
 )
 
+class CommitAuthor(BaseModel):
+  name: str
+  email: str
+  date: datetime
+
+class CommitDetail(BaseModel):
+  author: CommitAuthor
+  message: str
+
+class GitHubCommit(BaseModel):
+  sha: str
+  html_url: str
+  commit: CommitDetail
+
 class GitHubUser(BaseModel):
   id: int
   login: str
@@ -44,7 +58,7 @@ class GitHubRepo(BaseModel):
   updated_at: datetime
   stargazers_count: int
   watchers_count: int
-  language: str
+  language: Optional[str]
   archived: bool
   topics: List[str] = []
   forks: int
