@@ -1,0 +1,5 @@
+orjson
+aiohttp
+munch
+pydantic
+aiofiles

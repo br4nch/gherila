@@ -1,6 +1,6 @@
 from munch import DefaultMunch
 from typing import Any
-from aiohttp import ClientSession, CookieJar
+from aiohttp import ClientSession
 
 from .exceptions import Error
 
@@ -20,13 +20,7 @@ class State:
       ):
         return await response.text()
 
-      elif response.content_type in (
-        (
-          'image/',
-          'video/',
-          'audio/'
-        )
-      ):
+      elif response.content_type.startswith(('image/', 'video/', 'audio/')):
         return await response.read()
 
       elif response.content_type in (
