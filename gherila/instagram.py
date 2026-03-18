@@ -1,4 +1,8 @@
 from urllib.parse import urlparse
+from re import (
+  compile,
+  search
+)
 
 from .http import State
 from typing import Optional
@@ -7,8 +11,11 @@ from .models import (
   InstagramUser,
   InstagramStory,
   InstagramHighlight,
-  InstagramMedia
+  InstagramMedia,
+  InstagramComment
 )
+
+INSTAGRAM_REGEX = compile(r"^(?:https?:\/\/)?(?:www\.)?instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]+)")
 
 class Instagram:
   def __init__(self: "Instagram", csrf: str, session_id: str):
@@ -24,9 +31,9 @@ class Instagram:
 
     Parameters
     ----------
-    username: :class:`str`
+    username : :class:`str`
       The username of the user to fetch the info.
-    
+
     Returns
     -------
     :class:`InstagramUser`
@@ -49,11 +56,11 @@ class Instagram:
 
     Parameters
     ----------
-    username: :class:`str`
+    username : :class:`str`
       The username of the user to fetch the stories.
-    amount: Optional[:class:`int`]
+    amount : Optional[:class:`int`]
       The amount of stories to fetch. If the amount is not given all stories will be fetched.
-    
+
     Returns
     -------
     :class:`List[InstagramStory]`
@@ -73,7 +80,7 @@ class Instagram:
           story.video_versions,
           key=lambda x: x.height * x.width
         )[-1].url
-      
+
       if "image_versions2" in story:
         story.image_url = sorted(
           story.image_versions2.candidates,
@@ -93,11 +100,11 @@ class Instagram:
 
     Parameters
     ----------
-    username: :class:`str`
+    username : :class:`str`
       The username of the user to fetch the highlights.
-    amount: Optional[:class:`int`]
+    amount : Optional[:class:`int`]
       The amount of highlights to fetch. If the amount is not given all highlights will be fetched.
-    
+
     Returns
     -------
     :class:`List[InstagramHighlight]`
@@ -127,16 +134,19 @@ class Instagram:
 
     Parameters
     ----------
-    url: :class:`str`
+    url : :class:`str`
       The url of the post to fetch it.
-    amount: Optional[:class:`int`]
+    amount : Optional[:class:`int`]
       The amount of images/videos to fetch. If the amount is not given all will be fetched.
-    
+
     Returns
     -------
     :class:`List[InstagramMedia]`
       A list of InstagramMedia objects with the post images/videos.
     """
+    if not INSTAGRAM_REGEX.match(url):
+      raise Error("This is not a valid instagram post url.")
+
     char = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
     code = [p for p in (urlparse(url).path).split("/") if p][1]
     media_id = sum(char.index(x) * (len(char) ** i) for i, x in enumerate(reversed(code)))
@@ -169,3 +179,32 @@ class Instagram:
       medias.append(media)
 
     return [InstagramMedia(**m) for m in medias]
+
+  async def get_comments(self: "Instagram", url: str, amount: Optional[int] = None):
+    """
+    Get the comments of a post by url.
+
+    Parameters
+    ----------
+    url : :class:`str`
+      The url of the post to fetch the comments from.
+    amount : Optional[:class:`int`]
+      The amount of comments to fetch. If the amount is not given all will be fetched.
+
+    Returns
+    -------
+    :class:`List[InstagramComment]`
+      A list of InstagramComment object with the post comments.
+    """
+    post = await self.get_post(url)
+    data = await self.session.request(
+      "GET",
+      f"https://www.instagram.com/api/v1/media/{post[0].pk}/comments",
+      headers=self.headers
+    )
+    comments = data.get("comments", [])
+
+    if amount:
+      comments = comments[:amount]
+
+    return [InstagramComment(**comment) for comment in comments]

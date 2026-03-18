@@ -158,7 +158,22 @@ class InstagramHighlight(BaseModel):
   cover_media: str
   user: InstagramStoryUser
 
+class InstagramCommentUser(BaseModel):
+  pk: int
+  username: str
+  full_name: str
+  profile_pic_url: HttpUrl
+  is_private: bool
+  is_verified: bool
+
+class InstagramComment(BaseModel):
+  pk: int
+  text: str
+  created_at: datetime
+  user: InstagramCommentUser
+
 class InstagramMedia(BaseModel):
+  pk: int
   id: int
   code: str
   media_type: int
