@@ -9,6 +9,28 @@ from pydantic import (
   HttpUrl
 )
 
+class TwitterUserBiolinks(BaseModel):
+  display_url: str
+  expanded_url: str
+  url: str
+
+class TwitterUser(BaseModel):
+  username: str
+  id: int
+  avatar: str
+  bio: str
+  display_name: Optional[str]
+  location: str
+  verified: bool
+  created_at: str
+  followers: int
+  following: int
+  posts: int
+  liked_posts: int
+  tweets: int
+  biolinks: List[TwitterUserBiolinks]
+  url: str
+
 class CommitAuthor(BaseModel):
   name: str
   email: str

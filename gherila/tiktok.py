@@ -44,7 +44,7 @@ class TikTok:
 
     Parameters
     ----------
-    username: :class:`str`
+    username : :class:`str`
       The username of the user to fetch the info.
 
     Returns
@@ -75,7 +75,7 @@ class TikTok:
 
     Parameters
     ----------
-    url: :class:`str`
+    url : :class:`str`
       The tiktok video url.
 
     Returns
@@ -106,9 +106,9 @@ class TikTok:
 
     Parameters
     ----------
-    video: :class:`TikTokVideo`
+    video : :class:`TikTokVideo`
       The TikTokVideo object to download.
-    path: :class:`str` | :class:`Path` | None
+    path : :class:`str` | :class:`Path` | None
       The path to save the video. If None, it will return a BytesIO object.
 
     Returns
