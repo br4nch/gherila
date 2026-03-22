@@ -18,18 +18,45 @@ class TwitterUser(BaseModel):
   username: str
   id: int
   avatar: str
+  banner: Optional[str]
   bio: str
   display_name: Optional[str]
   location: str
   verified: bool
+  verified_type: Optional[str]
   created_at: str
   followers: int
   following: int
   posts: int
   liked_posts: int
   tweets: int
+  pinned_tweets: Optional[List[str]]
   biolinks: List[TwitterUserBiolinks]
   url: str
+
+class TwitterMedia(BaseModel):
+  type: str
+  video_url: Optional[str] = None
+  image_url: Optional[str] = None
+
+class TwitterTweet(BaseModel):
+  id: int
+  text: Optional[str]
+  author: TwitterUser
+  lang: str
+  likes: int
+  replies: int
+  retweets: int
+  quote: int
+  retweeted: bool
+  created_at: str
+  views: int
+  bookmarks: int
+  is_quote: bool
+  quote_url: Optional[str]
+  hashtags: Optional[List[str]]
+  mentions: Optional[List[str]]
+  media: List[TwitterMedia]
 
 class CommitAuthor(BaseModel):
   name: str
