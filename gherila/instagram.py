@@ -76,16 +76,16 @@ class Instagram:
     stories = []
     for story in data.get("items", []):
       if "video_versions" in story:
-        story.video_url = sorted(
+        story.video_url = max(
           story.video_versions,
           key=lambda x: x.height * x.width
-        )[-1].url
+        ).url
 
       if "image_versions2" in story:
-        story.image_url = sorted(
+        story.image_url = max(
           story.image_versions2.candidates,
           key=lambda x: x.height * x.width,
-        )[-1].url
+        ).url
 
       stories.append(story)
 
@@ -159,11 +159,22 @@ class Instagram:
 
     medias = []
     for media in data.get("items", []):
+      if "carousel_media" in media:
+        for slide in media.carousel_media:
+          if "image_versions2" in slide:
+            media.image_urls = [media_url.url for media_url in slide.image_versions2.candidates]
+
+          if "video_versions" in slide:
+            media.video_url = max(
+              slide.video_versions,
+              key=lambda x: x.height * x.width,
+            ).url
+
       if "video_versions" in media:
-        media.video_url = sorted(
+        media.video_url = max(
           media.video_versions,
           key=lambda x: x.height * x.width,
-        )[-1].url
+        ).url
 
       if "image_versions2" in media:
         urls = [media_url.url for media_url in media.image_versions2.candidates]
@@ -171,10 +182,10 @@ class Instagram:
           urls = urls[:amount]
 
         media.image_urls = urls
-        media.thumbnail_url = sorted(
+        media.thumbnail_url = max(
           media.image_versions2.candidates,
           key=lambda x: x.height * x.width,
-        )[-1].url
+        ).url
 
       medias.append(media)
 
