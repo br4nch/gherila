@@ -392,10 +392,10 @@ class Twitter:
                   if getattr(v, "content_type", "") == "video/mp4"
                 ]
                 if mp4:
-                  media.video_url = sorted(
+                  media.video_url = max(
                     mp4,
                     key=lambda x: x.bitrate,
-                  )[-1].url
+                  ).url
 
               if m.type == "photo":
                 media.image_url = m.media_url_https

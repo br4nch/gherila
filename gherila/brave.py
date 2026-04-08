@@ -1,8 +1,7 @@
 from selectolax.parser import HTMLParser
 from re import (
-  findall,
-  match,
-  sub
+  sub,
+  compile
 )
 
 from .http import State
@@ -12,6 +11,8 @@ from .models import (
   BraveResult,
   BraveSearch
 )
+
+IMG_PATTERN = compile(r'<img[^>]+src="([^">]+)"')
 
 class Brave:
   def __init__(self: "Brave"):
@@ -44,14 +45,12 @@ class Brave:
         "safesearch": "strict" if safe else "off",
       }
     )
-    imgs = findall(r'<img[^>]+src="([^">]+)"', data)
+
     if not (
-      r := list(
-        filter(
-          lambda img: match(r"^https://imgs.search.brave.com/", img) and
-          '32:32' not in img, imgs
-        )
-      )
+      r := [
+        img for img in IMG_PATTERN.findall(data)
+        if img.startswith("https://imgs.search.brave.com/") and "32:32" not in img
+      ]
     ):
       raise Error(f"No images were found for the query `{query}`.")
 
@@ -89,10 +88,11 @@ class Brave:
     )
     tree = HTMLParser(data)
     results = []
+    seen = set()
 
     for r in tree.css("a"):
       url = r.attributes.get("href", "")
-      if not url.startswith("http") or "brave" in url.lower():
+      if not url.startswith("http") or "brave" in url.lower() or url in seen:
         continue
 
       if len(
@@ -109,12 +109,6 @@ class Brave:
         text = content.text(separator=" ", strip=True)
         description = sub(r"https?://[^\s]+", "", text.replace(title, "")).strip()
 
-      if any(
-        r.url == url
-        for r in results
-      ):
-        continue
-
       results.append(
         BraveResult(
           url=url,
@@ -122,6 +116,7 @@ class Brave:
           description=description
         )
       )
+      seen.add(url)
 
       if len(results) >= limit:
         break

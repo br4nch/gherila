@@ -73,8 +73,12 @@ class Instagram:
       headers=self.headers,
     )).get("reel", {})
 
+    items = data.get("items", [])
+    if amount:
+      items = items[:amount]
+
     stories = []
-    for story in data.get("items", []):
+    for story in items:
       if "video_versions" in story:
         story.video_url = max(
           story.video_versions,
@@ -88,9 +92,6 @@ class Instagram:
         ).url
 
       stories.append(story)
-
-    if amount:
-      stories = stories[:amount]
 
     return [InstagramStory(**s) for s in stories]
 
@@ -116,15 +117,16 @@ class Instagram:
       f"https://i.instagram.com/api/v1/highlights/{user_id}/highlights_tray/",
       headers=self.headers,
     )
+    tray = data.get("tray", [])
+    if amount:
+      tray = tray[:amount]
+
     highlights = []
-    for highlight in data.get("tray", []):
+    for highlight in tray:
       highlight.id = highlight.id.split(":")[1]
       highlight.cover_media = highlight.cover_media.cropped_image_version.url
 
       highlights.append(highlight)
-
-    if amount:
-      highlights = highlights[:amount]
 
     return [InstagramHighlight(**h) for h in highlights]
 

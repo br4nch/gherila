@@ -2,7 +2,7 @@ import aiofiles
 
 from pathlib import Path
 from io import BytesIO
-from re import search, compile
+from re import compile
 from orjson import loads
 from munch import munchify
 
@@ -14,26 +14,26 @@ from .models import (
   TikTokVideo
 )
 
-TIKTOK_CONTENT = r"^.*https:\/\/(?:m|www|vm)?\.?tiktok\.com\/((?:.*\b(?:(?:v|embed|photo|video|t)\/|\?shareId=|\&item_id=)(\d+))|\w+)"
-TIKTOK_REGEX = compile(TIKTOK_CONTENT)
+TIKTOK_REGEX = compile(r"^.*https:\/\/(?:m|www|vm)?\.?tiktok\.com\/((?:.*\b(?:(?:v|embed|photo|video|t)\/|\?shareId=|\&item_id=)(\d+))|\w+)")
+REHYDRATION_REGEX = compile(r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>')
 
 class TikTok:
   def __init__(self: "TikTok"):
     self.session = State()
     self.headers = {
       "Cookie": "ttwid=1%7C4jtfZIORfW9Nma3caSwVPQKeOIPeikQC-cptB9SFtRE%7C1752327502%7C904a70c"
-                    "5b47b777141ce0610b027cdc06a7e8072728680fd3ebac63835e2a14c; tt_chain_token=oD2" 
-                    "L/9Ze+RjY0FOHasXjBQ==; msToken=KyyIxtpF2qUUWINhGmEz_s7aNRRJCz9p9G4dtzumDTOW6R" 
-                    "ikevqzSIcvv31WVjsKAk5_bWRq_RInwctnMO4uNkbAHPNW0AxbCK2a5qEoYfMvtT-Ms0y8--bN5mqw" 
-                    "N8DSwclub7i7s56GqoqxfYFkGg==; odin_tt=33649e9b6a18d8297dbf1158c376a47a61ddc1bf"
-                    "9f476a49a4e9d6f32613904c4a1845084307f849afa808328f02ddff3f67c8cca6c262ce5d8088"
-                    "bd1c7ad9cdfd7e8cc62c6feb06af87cf87597087b8; "
-                    "cookie-consent={%22optional%22:true%2C%22ga%22:true%2C%22af%22:true%2C%22fbp"
-                    "%22:true%2C%22lip%22:true%2C%22bing%22:true%2C%22ttads%22:true%2C%22reddit%22"
-                    ":true%2C%22hubspot%22:true%2C%22version%22:%22v10%22}; passport_csrf_token="
-                    "7c6732ea13325a8530707a417a62722f; passport_csrf_token_default=7c6732ea13325a85"
-                    "30707a417a62722f; tt_csrf_token=TIHqbHIW-GMVGwOTyyL294UceCXs-vrmm5vE; s_v_web_"
-                    "id=verify_md0akixj_dSCvFkWD_vFBj_4bzi_B1zz_KPTQzHHfoAAt",
+        "5b47b777141ce0610b027cdc06a7e8072728680fd3ebac63835e2a14c; tt_chain_token=oD2" 
+        "L/9Ze+RjY0FOHasXjBQ==; msToken=KyyIxtpF2qUUWINhGmEz_s7aNRRJCz9p9G4dtzumDTOW6R" 
+        "ikevqzSIcvv31WVjsKAk5_bWRq_RInwctnMO4uNkbAHPNW0AxbCK2a5qEoYfMvtT-Ms0y8--bN5mqw" 
+        "N8DSwclub7i7s56GqoqxfYFkGg==; odin_tt=33649e9b6a18d8297dbf1158c376a47a61ddc1bf"
+        "9f476a49a4e9d6f32613904c4a1845084307f849afa808328f02ddff3f67c8cca6c262ce5d8088"
+        "bd1c7ad9cdfd7e8cc62c6feb06af87cf87597087b8; "
+        "cookie-consent={%22optional%22:true%2C%22ga%22:true%2C%22af%22:true%2C%22fbp"
+        "%22:true%2C%22lip%22:true%2C%22bing%22:true%2C%22ttads%22:true%2C%22reddit%22"
+        ":true%2C%22hubspot%22:true%2C%22version%22:%22v10%22}; passport_csrf_token="
+        "7c6732ea13325a8530707a417a62722f; passport_csrf_token_default=7c6732ea13325a85"
+        "30707a417a62722f; tt_csrf_token=TIHqbHIW-GMVGwOTyyL294UceCXs-vrmm5vE; s_v_web_"
+        "id=verify_md0akixj_dSCvFkWD_vFBj_4bzi_B1zz_KPTQzHHfoAAt",
       "Referer": "https://www.tiktok.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
@@ -58,7 +58,7 @@ class TikTok:
       f"https://www.tiktok.com/@{username}",
       headers=self.headers,
     )
-    result = search(r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>', data)
+    result = REHYDRATION_REGEX.search(data)
     raw = loads(result.group(1))["__DEFAULT_SCOPE__"]["webapp.user-detail"]
     loaded = munchify(raw)
 
@@ -91,7 +91,7 @@ class TikTok:
       url,
       headers=self.headers,
     )
-    result = search(r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>', data)
+    result = REHYDRATION_REGEX.search(data)
     loaded = munchify(loads(result.group(1))["__DEFAULT_SCOPE__"]["webapp.video-detail"])
 
     r = loaded.itemInfo.itemStruct
@@ -126,7 +126,7 @@ class TikTok:
       save_path = Path(path)
         
       async with aiofiles.open(save_path, "wb") as f:
-          await f.write(video_data)
+        await f.write(video_data)
           
       return save_path
     else:
