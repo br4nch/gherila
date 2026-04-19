@@ -6,8 +6,43 @@ from typing import (
 )
 from pydantic import (
   BaseModel,
-  HttpUrl
+  HttpUrl,
+  Field
 )
+
+class RedditUser(BaseModel):
+  id: str
+  name: str
+  created: datetime
+  link_karma: int
+  comment_karma: int
+  total_karma: int
+  is_mod: bool
+  verified: bool
+  is_gold: bool
+  icon_img: HttpUrl
+
+class SubReddit(BaseModel):
+  id: str
+  author: str
+  title: str
+  selftext: str
+  url: str
+  permalink: str
+  ups: int
+  upvote_ratio: float
+  num_comments: int
+  over_18: bool
+  is_video: bool
+  is_self: bool
+  stickied: bool
+  spoiler: bool
+  created_utc: datetime
+  thumbnail: HttpUrl
+  link_flair_text: Optional[str]
+  domain: str
+  category: Optional[str]
+  total_awards_received: int
 
 class TwitterUserBiolinks(BaseModel):
   display_url: str
@@ -129,32 +164,32 @@ class TikTokBioLinks(BaseModel):
   link: str
 
 class TikTokStats(BaseModel):
-  followingCount: int
-  followerCount: int
-  heartCount: int
-  videoCount: int
+  following: int = Field(alias="followingCount")
+  followers: int = Field(alias="followerCount")
+  likes: int = Field(alias="heartCount")
+  videos: int = Field(alias="videoCount")
 
 class TikTokUser(BaseModel):
   id: int
-  uniqueId: str
+  username: str = Field(alias="uniqueId")
   nickname: str
-  signature: str
-  avatarMedium: HttpUrl
-  verified: bool
-  privateAccount: bool
+  description: str = Field(alias="signature")
+  avatar: HttpUrl = Field(alias="avatarLarger")
+  is_verified: bool = Field(alias="verified")
+  is_private: bool = Field(alias="privateAccount")
   stats: TikTokStats
 
 class TikTokVideoStats(BaseModel):
-  diggCount: int
-  shareCount: int
-  commentCount: int
-  playCount: int
-  collectCount: int
+  likes: int = Field(alias="diggCount")
+  shares: int = Field(alias="shareCount")
+  comments: int = Field(alias="commentCount")
+  plays: int = Field(alias="playCount")
+  saves: int = Field(alias="collectCount")
 
 class TikTokVideo(BaseModel):
   id: int
-  desc: str
-  createTime: datetime
+  description: str = Field(alias="desc")
+  created: datetime = Field(alias="createTime")
   stats: TikTokVideoStats
   author: TikTokUser
   url: str
@@ -172,10 +207,10 @@ class InstagramUser(BaseModel):
   is_private: bool
   is_verified: bool
   media_count: int
-  follower_count: int
-  following_count: int
+  followers: int = Field(alias="follower_count")
+  following: int = Field(alias="following_count")
   is_business: bool
-  profile_pic_url: HttpUrl
+  avatar: HttpUrl = Field(alias="profile_pic_url_hd")
   biography: Optional[str] = None
   account_type: Optional[int] = None
   external_url: Optional[str] = None
@@ -185,7 +220,7 @@ class InstagramStoryUser(BaseModel):
   pk: int
   username: Optional[str] = None
   full_name: Optional[str] = None
-  profile_pic_url: Optional[HttpUrl] = None
+  avatar: Optional[HttpUrl] = Field(default=None, alias="profile_pic_url")
   is_private: Optional[bool] = None
 
 class InstagramStory(BaseModel):
@@ -211,7 +246,7 @@ class InstagramCommentUser(BaseModel):
   pk: int
   username: str
   full_name: str
-  profile_pic_url: HttpUrl
+  avatar: HttpUrl = Field(alias="profile_pic_url")
   is_private: bool
   is_verified: bool
 
