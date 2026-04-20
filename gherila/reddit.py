@@ -13,7 +13,17 @@ class Reddit:
   
   async def get_subreddit(self: "Reddit", url: str):
     """
+    Get subreddit information by url.
+
+    Parameters
+    ----------
+    url : :class:`str`
+      The url of the subreddit post to fetch the information.
     
+    Returns
+    -------
+    :class:`SubReddit`
+      A SubReddit object with the subreddit information.
     """
     clean = url.strip().rstrip("/")
     data = await self.session.request(
@@ -25,7 +35,17 @@ class Reddit:
   
   async def get_user(self: "Reddit", username: str):
     """
+    Get user information by username.
+
+    Parameters
+    ----------
+    username : :class:`str`
+      The username of the user to fetch the information.
     
+    Returns
+    -------
+    :class:`RedditUser`
+      A RedditUser object with the user information.
     """
     data = await self.session.request(
       "GET",

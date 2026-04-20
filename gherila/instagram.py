@@ -1,8 +1,5 @@
 from urllib.parse import urlparse
-from re import (
-  compile,
-  search
-)
+from re import compile
 
 from .http import State
 from typing import Optional
