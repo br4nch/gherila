@@ -10,6 +10,37 @@ from pydantic import (
   Field
 )
 
+class SubReddit(BaseModel):
+  id: str
+  display_name: str
+  title: str
+  public_description: str
+  subscribers: int
+  created_utc: datetime
+  over18: bool
+  community_icon: Optional[str] = None
+  banner_background_image: Optional[str] = None
+  wiki_enabled: Optional[bool] = None
+
+class RedditSearch(BaseModel):
+  id: str
+  author: str
+  title: str
+  selftext: str
+  url: str
+  permalink: str
+  ups: int
+  upvote_ratio: float
+  num_comments: int
+  over_18: bool
+  is_video: bool
+  is_self: bool
+  post_hint: Optional[str] = None
+  is_gallery: bool = False
+  gallery_data: Optional[dict] = None
+  media: Optional[dict] = None
+  created_utc: datetime
+
 class RedditUser(BaseModel):
   id: str
   name: str
@@ -22,7 +53,7 @@ class RedditUser(BaseModel):
   is_gold: bool
   icon_img: HttpUrl
 
-class SubReddit(BaseModel):
+class RedditPost(BaseModel):
   id: str
   author: str
   title: str
@@ -38,7 +69,7 @@ class SubReddit(BaseModel):
   stickied: bool
   spoiler: bool
   created_utc: datetime
-  thumbnail: HttpUrl
+  thumbnail: Optional[str] = None
   link_flair_text: Optional[str]
   domain: str
   category: Optional[str]
