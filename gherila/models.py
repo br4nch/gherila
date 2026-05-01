@@ -2,13 +2,42 @@ from datetime import datetime
 
 from typing import (
   Optional,
+  Any,
   List
 )
 from pydantic import (
   BaseModel,
   HttpUrl,
-  Field
+  Field,
+  field_validator
 )
+
+class RedditComment(BaseModel):
+  id: str
+  author: str
+  body: str
+  ups: int
+  created_utc: datetime
+  permalink: str
+  is_submitter: bool
+  replies: List["RedditComment"]
+
+  @field_validator("replies", mode="before")
+  @classmethod
+  def parse_replies(cls, v: Any) -> List["RedditComment"]:
+    if isinstance(v, str) or not v:
+      return []
+
+    children = v.get("data", {}).get("children", [])
+    comments = []
+
+    for c in children:
+      if c.get("kind") == "t1":
+        comments.append(cls(**c['data']))
+
+    return comments
+
+RedditComment.model_rebuild()
 
 class SubReddit(BaseModel):
   id: str

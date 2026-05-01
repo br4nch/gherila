@@ -21,7 +21,12 @@ class Brave:
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
   }
   
-  async def get_images(self: "Brave", query: str, safe: bool = True):
+  async def get_images(
+    self: "Brave",
+    query: str,
+    safe: bool = True,
+    limit: int = 25
+  ):
     """
     Get images from Brave.
 
@@ -31,6 +36,8 @@ class Brave:
       The query to search for.
     safe : :class:`bool`
       Whether to enable or disable safe search. Default is `True`.
+    limit : :class:`int`
+      The number of images to return. Default is 10.
 
     Returns
     -------
@@ -43,7 +50,8 @@ class Brave:
       params={
         "q": query,
         "safesearch": "strict" if safe else "off",
-      }
+      },
+      headers=self.headers,
     )
 
     if not (
@@ -53,6 +61,9 @@ class Brave:
       ]
     ):
       raise Error(f"No images were found for the query `{query}`.")
+    
+    if limit:
+      r = r[:limit]
 
     return BraveImages(
       query=query,
