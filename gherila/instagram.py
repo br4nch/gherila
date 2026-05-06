@@ -15,8 +15,14 @@ from .models import (
 INSTAGRAM_REGEX = compile(r"^(?:https?:\/\/)?(?:www\.)?instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]+)")
 
 class Instagram:
-  def __init__(self: "Instagram", csrf: str, session_id: str):
+  def __init__(
+    self: "Instagram",
+    csrf: str,
+    session_id: str,
+    proxy: str = None
+  ):
     self.session = State()
+    self.proxy = proxy
     self.headers = {
       "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 12_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 105.0.0.11.118 (iPhone11,8; iOS 12_3_1; en_US; en-US; scale=2.00; 828x1792; 165586599)",
       "Cookie": f"csrftoken={csrf}; sessionid={session_id}",
@@ -40,6 +46,7 @@ class Instagram:
       "GET",
       f"https://i.instagram.com/api/v1/users/{username}/usernameinfo",
       headers=self.headers,
+      proxy=self.proxy,
     )
 
     if not data.user:
@@ -64,11 +71,14 @@ class Instagram:
       A list of InstagramStory objects with the user stories.
     """
     user_id = (await self.get_user(username)).pk
-    data = (await self.session.request(
-      "GET",
-      f"https://i.instagram.com/api/v1/feed/user/{user_id}/story/",
-      headers=self.headers,
-    )).get("reel", {})
+    data = (
+      await self.session.request(
+        "GET",
+        f"https://i.instagram.com/api/v1/feed/user/{user_id}/story/",
+        headers=self.headers,
+        proxy=self.proxy,
+      )
+    ).get("reel", {})
 
     items = data.get("items", [])
     if amount:
@@ -113,6 +123,7 @@ class Instagram:
       "GET",
       f"https://i.instagram.com/api/v1/highlights/{user_id}/highlights_tray/",
       headers=self.headers,
+      proxy=self.proxy,
     )
     tray = data.get("tray", [])
     if amount:
@@ -154,6 +165,7 @@ class Instagram:
       "GET",
       f"https://i.instagram.com/api/v1/media/{media_id}/info",
       headers=self.headers,
+      proxy=self.proxy,
     )
 
     medias = []
@@ -210,7 +222,8 @@ class Instagram:
     data = await self.session.request(
       "GET",
       f"https://www.instagram.com/api/v1/media/{post[0].pk}/comments",
-      headers=self.headers
+      headers=self.headers,
+      proxy=self.proxy,
     )
     comments = data.get("comments", [])
 
