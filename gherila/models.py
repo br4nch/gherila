@@ -270,7 +270,7 @@ class InstagramUser(BaseModel):
   followers: int = Field(alias="follower_count")
   following: int = Field(alias="following_count")
   is_business: bool
-  avatar: HttpUrl = Field(default=None, alias="profile_pic_url")
+  avatar: Optional[HttpUrl] = Field(default=None, alias="profile_pic_url")
   biography: Optional[str] = None
   account_type: Optional[int] = None
   external_url: Optional[str] = None
