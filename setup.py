@@ -8,7 +8,7 @@ setup(
   license='MIT',
   description='An async package destioned to fetch information from different platforms',
   python_requires='>=3.8.0',
-  install_requires=['munch', 'aiohttp', 'pydantic', 'orjson', 'aiofiles'],
+  install_requires=['munch', 'aiohttp', 'pydantic', 'orjson', 'aiofiles', 'selectolax'],
   packages=['gherila'],
   classifiers=[
     'Programming Language :: Python :: 3.8',
