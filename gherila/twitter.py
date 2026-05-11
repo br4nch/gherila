@@ -25,6 +25,30 @@ class Twitter:
       "Cookie": f"auth_token={auth_token}; ct0={ct0}"
       }
 
+  def _media(self: "Twitter", legacy):
+    medias = []
+    if "extended_entities" in legacy:
+      for m in legacy.extended_entities.media:
+        media = TwitterMedia(type=m.type)
+
+        if "video_info" in m:
+          mp4 = [
+            v
+            for v in m.video_info.variants
+            if getattr(v, "content_type", "") == "video/mp4"
+          ]
+          if mp4:
+            media.video_url = max(
+              mp4,
+              key=lambda x: x.bitrate,
+            ).url
+
+        if m.type == "photo":
+          media.image_url = m.media_url_https
+
+        medias.append(media)
+    return medias
+
   async def get_user(self: "Twitter", username: str):
     """
     Get a twitter (x.com) user information.
@@ -230,28 +254,6 @@ class Twitter:
       else None
     )
 
-    medias = []
-    if "extended_entities" in legacy:
-      for m in legacy.extended_entities.media:
-        media = TwitterMedia(type=m.type)
-
-        if "video_info" in m:
-          mp4 = [
-            v
-            for v in m.video_info.variants
-            if getattr(v, "content_type", "") == "video/mp4"
-          ]
-          if mp4:
-            media.video_url = sorted(
-              mp4,
-              key=lambda x: x.bitrate,
-            )[-1].url
-
-        if m.type == "photo":
-          media.image_url = m.media_url_https
-
-        medias.append(media)
-
     return TwitterTweet(
       id=tweetid,
       text=text,
@@ -269,7 +271,7 @@ class Twitter:
       quote_url=quote_url,
       hashtags=[h.text for h in legacy.entities.hashtags],
       mentions=[m.screen_name for m in legacy.entities.user_mentions],
-      media=medias
+      media=self._media(legacy)
     )
 
   async def get_user_tweets(self: "Twitter", username: str):
@@ -380,28 +382,6 @@ class Twitter:
             else None
           )
 
-          medias = []
-          if "extended_entities" in legacy:
-            for m in legacy.extended_entities.media:
-              media = TwitterMedia(type=m.type)
-
-              if "video_info" in m:
-                mp4 = [
-                  v
-                  for v in m.video_info.variants
-                  if getattr(v, "content_type", "") == "video/mp4"
-                ]
-                if mp4:
-                  media.video_url = max(
-                    mp4,
-                    key=lambda x: x.bitrate,
-                  ).url
-
-              if m.type == "photo":
-                media.image_url = m.media_url_https
-
-              medias.append(media)
-
           tweets.append(
           TwitterTweet(
             id=legacy.id_str,
@@ -420,7 +400,7 @@ class Twitter:
             quote_url=quote_url,
             hashtags=[h.text for h in legacy.entities.hashtags] if "hashtags" in legacy.entities else [],
             mentions=[m.screen_name for m in legacy.entities.user_mentions] if "user_mentions" in legacy.entities else [],
-            media=medias
+            media=self._media(legacy)
           )
         )
 
