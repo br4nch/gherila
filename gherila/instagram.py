@@ -9,7 +9,8 @@ from .models import (
   InstagramStory,
   InstagramHighlight,
   InstagramMedia,
-  InstagramComment
+  InstagramComment,
+  InstagramFollowerUser
 )
 
 INSTAGRAM_REGEX = compile(r"^(?:https?:\/\/)?(?:www\.)?instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]+)")
@@ -42,6 +43,7 @@ class Instagram:
     :class:`InstagramUser`
       An InstagramUser object with the user info.
     """
+
     data = await self.session.request(
       "GET",
       f"https://i.instagram.com/api/v1/users/{username}/usernameinfo",
@@ -231,3 +233,65 @@ class Instagram:
       comments = comments[:amount]
 
     return [InstagramComment(**comment) for comment in comments]
+
+  async def get_followers(self: "Instagram", username: str, amount: Optional[int] = None):
+    """
+    Get a user followers by username.
+
+    Parameters
+    ----------
+    username : :class:`str`
+      The username of the user to fetch the followers.
+    amount : Optional[:class:`int`]
+      The amount of followers to fetch. If the amount is not given all followers will be fetched.
+
+    Returns
+    -------
+    :class:`List[InstagramFollowerUser]`
+      A list of InstagramFollowerUser objects with the user followers.
+    """
+    user = await self.get_user(username)
+    data = await self.session.request(
+      "GET",
+      f"https://i.instagram.com/api/v1/friendships/{user.pk}/followers/",
+      headers=self.headers,
+    )
+    followers = []
+    for f in data.get("users", []):
+      followers.append(InstagramFollowerUser(**f))
+
+    if amount:
+      followers = followers[:amount]
+
+    return followers
+
+  async def get_following(self: "Instagram", username: str, amount: Optional[int] = None):
+    """
+    Get a user following by username.
+
+    Parameters
+    ----------
+    username : :class:`str`
+      The username of the user to fetch the following.
+    amount : Optional[:class:`int`]
+      The amount of following to fetch. If the amount is not given all following will be fetched.
+
+    Returns
+    -------
+    :class:`List[InstagramFollowerUser]`
+      A list of InstagramFollowerUser objects with the user following.
+    """
+    user = await self.get_user(username)
+    data = await self.session.request(
+      "GET",
+      f"https://i.instagram.com/api/v1/friendships/{user.pk}/following/",
+      headers=self.headers,
+    )
+    following = []
+    for f in data.get("users", []):
+      following.append(InstagramFollowerUser(**f))
+
+    if amount:
+      following = following[:amount]
+
+    return following

@@ -331,3 +331,11 @@ class InstagramMedia(BaseModel):
   thumbnail_url: Optional[HttpUrl] = None
   video_url: Optional[HttpUrl] = None
   video_duration: Optional[float] = 0.0
+
+class InstagramFollowerUser(BaseModel):
+  pk: int
+  username: str
+  full_name: str
+  is_private: bool
+  is_verified: bool
+  avatar: Optional[HttpUrl] = Field(default=None, alias="profile_pic_url")
