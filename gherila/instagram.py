@@ -1,8 +1,16 @@
 from urllib.parse import urlparse
 from re import compile
+from random import uniform
+from asyncio import (
+  Semaphore,
+  sleep
+)
 
 from .http import State
-from typing import Optional
+from typing import (
+  Optional,
+  Dict
+)
 from .exceptions import Error
 from .models import (
   InstagramUser,
@@ -28,6 +36,25 @@ class Instagram:
       "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 12_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 105.0.0.11.118 (iPhone11,8; iOS 12_3_1; en_US; en-US; scale=2.00; 828x1792; 165586599)",
       "Cookie": f"csrftoken={csrf}; sessionid={session_id}",
     }
+    self._user_cache: Dict[str, InstagramUser] = {}
+
+  async def _request(
+    self: "Instagram",
+    method: str,
+    url: str,
+    max_concurrent: int = 3,
+    max_retries: int = 2,
+    **kwargs
+  ):
+    async with Semaphore(max_concurrent):
+      for a in range(max_retries):
+        try:
+          await sleep(uniform(0.5, 1.5))
+          kwargs.setdefault("headers", self.headers)
+          kwargs.setdefault("proxy", self.proxy)
+          return await self.session.request(method, url, **kwargs)
+        except Exception:
+          raise
 
   async def get_user(self: "Instagram", username: str):
     """
@@ -43,18 +70,20 @@ class Instagram:
     :class:`InstagramUser`
       An InstagramUser object with the user info.
     """
+    if username in self._user_cache:
+      return self._user_cache[username]
 
-    data = await self.session.request(
+    data = await self._request(
       "GET",
       f"https://i.instagram.com/api/v1/users/{username}/usernameinfo",
-      headers=self.headers,
-      proxy=self.proxy,
     )
 
-    if not data.user:
+    if not getattr(data, "user", None):
       raise Error(f"Can't find an user with the username `{username}`.")
 
-    return InstagramUser(**data.user)
+    obj = InstagramUser(**data.user)
+    self._user_cache[username] = obj
+    return obj
 
   async def get_story(self: "Instagram", username: str, amount: Optional[int] = None):
     """
@@ -74,11 +103,9 @@ class Instagram:
     """
     user_id = (await self.get_user(username)).pk
     data = (
-      await self.session.request(
+      await self._request(
         "GET",
         f"https://i.instagram.com/api/v1/feed/user/{user_id}/story/",
-        headers=self.headers,
-        proxy=self.proxy,
       )
     ).get("reel", {})
 
@@ -121,11 +148,9 @@ class Instagram:
       A list of InstagramHighlight objects with the user highlights.
     """
     user_id = (await self.get_user(username)).pk
-    data = await self.session.request(
+    data = await self._request(
       "GET",
       f"https://i.instagram.com/api/v1/highlights/{user_id}/highlights_tray/",
-      headers=self.headers,
-      proxy=self.proxy,
     )
     tray = data.get("tray", [])
     if amount:
@@ -163,11 +188,9 @@ class Instagram:
     code = [p for p in (urlparse(url).path).split("/") if p][1]
     media_id = sum(char.index(x) * (len(char) ** i) for i, x in enumerate(reversed(code)))
 
-    data = await self.session.request(
+    data = await self._request(
       "GET",
       f"https://i.instagram.com/api/v1/media/{media_id}/info",
-      headers=self.headers,
-      proxy=self.proxy,
     )
 
     medias = []
@@ -221,11 +244,9 @@ class Instagram:
       A list of InstagramComment object with the post comments.
     """
     post = await self.get_post(url)
-    data = await self.session.request(
+    data = await self._request(
       "GET",
       f"https://www.instagram.com/api/v1/media/{post[0].pk}/comments",
-      headers=self.headers,
-      proxy=self.proxy,
     )
     comments = data.get("comments", [])
 
@@ -251,10 +272,9 @@ class Instagram:
       A list of InstagramFollowerUser objects with the user followers.
     """
     user = await self.get_user(username)
-    data = await self.session.request(
+    data = await self._request(
       "GET",
       f"https://i.instagram.com/api/v1/friendships/{user.pk}/followers/",
-      headers=self.headers,
     )
     followers = []
     for f in data.get("users", []):
@@ -282,10 +302,9 @@ class Instagram:
       A list of InstagramFollowerUser objects with the user following.
     """
     user = await self.get_user(username)
-    data = await self.session.request(
+    data = await self._request(
       "GET",
       f"https://i.instagram.com/api/v1/friendships/{user.pk}/following/",
-      headers=self.headers,
     )
     following = []
     for f in data.get("users", []):
