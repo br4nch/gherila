@@ -348,7 +348,6 @@ class SnapUser(BaseModel):
   snapcode: HttpUrl
   bio: Optional[str]
   url: HttpUrl
-  has_story: bool = False
   subscriber_count: int = 0
   spotlight_videos: List[HttpUrl] = []
   banner: Optional[HttpUrl] = Field(default=None, alias="hero_image")
@@ -378,7 +377,6 @@ class SnapUser(BaseModel):
         'bio': user.get('bio'),
         'avatar': user.get('profilePictureUrl'),
         'snapcode': user.get('snapcodeImageUrl', '').replace('&type=SVG', '&type=PNG'),
-        'has_story': user.get('hasStory', False),
         'hero_image': user.get('squareHeroImageUrl') or None,
         'subscriber_count': sub_count,
       })
@@ -395,3 +393,14 @@ class SnapUser(BaseModel):
       mapped['spotlight_videos'] = videos
 
     return mapped
+
+class SnapStoryList(BaseModel):
+  url: HttpUrl
+  snap_id: str
+  preview_url: str
+  media_type: int
+  timestamp: int
+
+class SnapStory(BaseModel):
+  stories: List[SnapStoryList]
+  count: int

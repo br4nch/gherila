@@ -4,7 +4,7 @@ from munch import munchify, DefaultMunch
 
 from .http import State
 from .exceptions import Error
-from .models import SnapUser
+from .models import SnapUser, SnapStory
 
 SNAP_REGEX = compile(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>')
 
@@ -49,7 +49,6 @@ class Snapchat:
     user = {
       **loaded.userProfile,
       "spotlightHighlights": loaded.spotlightHighlights,
-      "story": loaded.story,
     }
     snap_user = SnapUser(
       **user,
@@ -58,3 +57,45 @@ class Snapchat:
     )
     self._user_cache[username] = snap_user
     return snap_user
+
+  async def get_story(self: "Snapchat", username: str):
+    """
+    Get the stories of a user by username.
+
+    Parameters
+    ----------
+    username : :class:`str`
+      The username of the user to fetch the stories.
+    
+    Returns
+    -------
+    :class:`List[SnapStory]`
+      A list of SnapStory objects with the user stories. 
+    """
+    data = await self.session.request(
+      "GET",
+      f"https://story.snapchat.com/add/{username}",
+      headers=self.headers,
+    )
+    d = SNAP_REGEX.search(data)
+    munch = loads(d.group(1))["props"]["pageProps"]
+    error = DefaultMunch(None, munch)
+    loaded = munchify(munch)
+
+    if not error.pageMetadata:
+      raise Error(f"Can't find an user with the username `@{username}`.")
+
+    stories = [
+      {
+        "url": snap.snapUrls.mediaUrl,
+        "snap_id": snap.snapId.value,
+        "preview_url": snap.snapUrls.mediaPreviewUrl.value,
+        "media_type": snap.snapMediaType,
+        "timestamp": snap.timestampInSec.value
+      }
+      for snap in loaded.story.snapList
+    ]
+    return SnapStory(
+      stories=stories,
+      count=len(stories)
+    )
