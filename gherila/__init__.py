@@ -4,3 +4,4 @@ from .brave import Brave
 from .github import GitHub
 from .twitter import Twitter
 from .reddit import Reddit
+from .snapchat import Snapchat

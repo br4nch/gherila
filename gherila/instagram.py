@@ -1,6 +1,9 @@
 from urllib.parse import urlparse
 from re import compile
-from random import uniform
+from random import (
+  uniform,
+  choice
+)
 from asyncio import (
   Semaphore,
   sleep
@@ -9,7 +12,8 @@ from asyncio import (
 from .http import State
 from typing import (
   Optional,
-  Dict
+  Dict,
+  List
 )
 from .exceptions import Error
 from .models import (
@@ -28,33 +32,38 @@ class Instagram:
     self: "Instagram",
     csrf: str,
     session_id: str,
-    proxy: str = None
+    proxy: Optional[List[str]] = None,
+    max_concurrent: int = 5
   ):
     self.session = State()
-    self.proxy = proxy
+    self.proxy = proxy or []
     self.headers = {
       "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 12_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 105.0.0.11.118 (iPhone11,8; iOS 12_3_1; en_US; en-US; scale=2.00; 828x1792; 165586599)",
       "Cookie": f"csrftoken={csrf}; sessionid={session_id}",
+      "X-IG-App-ID": "936619743392459",
     }
+    self.semaphore = Semaphore(max_concurrent)
     self._user_cache: Dict[str, InstagramUser] = {}
+
+  def _get_proxy(self: "Instagram"):
+    return choice(self.proxy) if self.proxy else None
 
   async def _request(
     self: "Instagram",
     method: str,
     url: str,
-    max_concurrent: int = 3,
     max_retries: int = 2,
     **kwargs
   ):
-    async with Semaphore(max_concurrent):
+    async with self.semaphore:
       for a in range(max_retries):
         try:
-          await sleep(uniform(0.5, 1.5))
           kwargs.setdefault("headers", self.headers)
-          kwargs.setdefault("proxy", self.proxy)
+          if self.proxy:
+            kwargs["proxy"] = self._get_proxy()
           return await self.session.request(method, url, **kwargs)
         except Exception:
-          raise
+          await sleep(uniform(1.0, 2.5) * (2 ** a))
 
   async def get_user(self: "Instagram", username: str):
     """

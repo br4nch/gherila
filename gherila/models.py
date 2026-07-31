@@ -9,7 +9,8 @@ from pydantic import (
   BaseModel,
   HttpUrl,
   Field,
-  field_validator
+  field_validator,
+  model_validator
 )
 
 class RedditComment(BaseModel):
@@ -339,3 +340,58 @@ class InstagramFollowerUser(BaseModel):
   is_private: bool
   is_verified: bool
   avatar: Optional[HttpUrl] = Field(default=None, alias="profile_pic_url")
+
+class SnapUser(BaseModel):
+  display_name: str
+  avatar: Optional[HttpUrl]
+  username: str
+  snapcode: HttpUrl
+  bio: Optional[str]
+  url: HttpUrl
+  has_story: bool = False
+  subscriber_count: int = 0
+  spotlight_videos: List[HttpUrl] = []
+  banner: Optional[HttpUrl] = Field(default=None, alias="hero_image")
+
+  @model_validator(mode="before")
+  @classmethod
+  def map_response(cls, data: Any):
+    if not isinstance(data, dict) or "$case" not in data:
+      return data
+
+    case = data['$case']
+    mapped = data.copy()
+    if case == "userInfo":
+      user = data.get('userInfo', {})
+      mapped.update({
+        'display_name': user.get('displayName'),
+        'bio': None,
+        'avatar': user.get("bitmoji3d", {}).get("avatarImage", {}).get("fallbackUrl"),
+        'snapcode': user.get('snapcodeImageUrl', '').replace('&type=SVG', '&type=PNG')
+      })
+
+    elif case == 'publicProfileInfo':
+      user = data.get('publicProfileInfo', {})
+      sub_count = int(user.get('subscriberCount', '0')) if (user.get('subscriberCount', '0')).isdigit() else 0
+      mapped.update({
+        'display_name': user.get('title'),
+        'bio': user.get('bio'),
+        'avatar': user.get('profilePictureUrl'),
+        'snapcode': user.get('snapcodeImageUrl', '').replace('&type=SVG', '&type=PNG'),
+        'has_story': user.get('hasStory', False),
+        'hero_image': user.get('squareHeroImageUrl') or None,
+        'subscriber_count': sub_count,
+      })
+      videos = []
+      highlights = data.get('spotlightHighlights', [])
+      for h in highlights:
+        try:
+          url = h.get('snapList', [])[0].get('snapUrls', {}).get('mediaUrl')
+          if url:
+            videos.append(url)
+        except IndexError:
+          continue
+
+      mapped['spotlight_videos'] = videos
+
+    return mapped

@@ -1,3 +1,5 @@
+import orjson
+
 from munch import DefaultMunch
 from typing import Any
 from aiohttp import ClientSession
@@ -29,7 +31,7 @@ class State:
         'text/javascript'
       ):
         try:
-          data = await response.json(content_type=None)
+          data = await response.json(loads=orjson.loads, content_type=None)
         except Exception as e:
           raise Error(f"Could not parse JSON -> {e}")
 
