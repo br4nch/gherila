@@ -99,3 +99,36 @@ class Snapchat:
       stories=stories,
       count=len(stories)
     )
+
+  async def get_highlights(self: "Snapchat", username: str):
+    """
+    
+    """
+    data = await self.session.request(
+      "GET",
+      f"https://story.snapchat.com/add/{username}",
+      headers=self.headers,
+    )
+    d = SNAP_REGEX.search(data)
+    munch = loads(d.group(1))["props"]["pageProps"]
+    error = DefaultMunch(None, munch)
+    loaded = munchify(munch)
+
+    if not error.pageMetadata:
+      raise Error(f"Can't find an user with the username `@{username}`.")
+
+    stories = [
+      {
+        "url": snap.snapUrls.mediaUrl,
+        "snap_id": snap.snapId.value,
+        "preview_url": snap.snapUrls.mediaPreviewUrl.value,
+        "media_type": snap.snapMediaType,
+        "timestamp": snap.timestampInSec.value
+      }
+      for h in loaded.spotlightHighlights
+      for snap in h.snapList
+    ]
+    return SnapStory(
+      stories=stories,
+      count=len(stories)
+    )

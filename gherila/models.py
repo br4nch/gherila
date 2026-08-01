@@ -402,5 +402,5 @@ class SnapStoryList(BaseModel):
   timestamp: int
 
 class SnapStory(BaseModel):
-  stories: List[SnapStoryList]
+  videos: List[SnapStoryList]
   count: int
