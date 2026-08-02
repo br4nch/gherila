@@ -96,7 +96,7 @@ class Snapchat:
       for snap in loaded.story.snapList
     ]
     return SnapStory(
-      stories=stories,
+      videos=stories,
       count=len(stories)
     )
 
@@ -117,7 +117,7 @@ class Snapchat:
     if not error.pageMetadata:
       raise Error(f"Can't find an user with the username `@{username}`.")
 
-    stories = [
+    highlights = [
       {
         "url": snap.snapUrls.mediaUrl,
         "snap_id": snap.snapId.value,
@@ -129,6 +129,6 @@ class Snapchat:
       for snap in h.snapList
     ]
     return SnapStory(
-      stories=stories,
-      count=len(stories)
+      videos=highlights,
+      count=len(highlights)
     )
