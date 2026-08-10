@@ -136,6 +136,20 @@ class Instagram:
           key=lambda x: x.height * x.width,
         ).url
 
+      if "story_bloks_stickers" in story:
+        for sticker in story.story_bloks_stickers:
+          bloks = sticker.get("bloks_sticker", {})
+          if bloks.get("bloks_sticker_type") == "mention":
+            mention = bloks.get("sticker_data", {}).get("ig_mention", {})
+            if mention:
+              story.mentions = [
+                {
+                  "user_id": mention.get("account_id"),
+                  "username": mention.get("username"),
+                  "profile_pic_url": mention.get("profile_pic_url"),
+                }
+              ]
+
       stories.append(story)
 
     return [InstagramStory(**s) for s in stories]

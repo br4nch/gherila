@@ -284,15 +284,23 @@ class InstagramStoryUser(BaseModel):
   avatar: Optional[HttpUrl] = Field(default=None, alias="profile_pic_url")
   is_private: Optional[bool] = None
 
+class StoryMention(BaseModel):
+  user_id: int
+  username: str
+  avatar: Optional[HttpUrl] = Field(default=None, alias="profile_pic_url")
+
 class InstagramStory(BaseModel):
-  id: int
+  id: str
   media_type: int
   taken_at: datetime
   user: InstagramStoryUser
   image_url: Optional[HttpUrl] = None
   video_url: Optional[HttpUrl] = None
   video_duration: Optional[float] = 0.0
-  thumnail_url: Optional[HttpUrl] = None
+  thumbnail_url: Optional[HttpUrl] = None
+  expiring_at: Optional[datetime] = None
+  mentions: List[StoryMention] = None
+  has_liked: Optional[bool] = False
 
 class InstagramHighlight(BaseModel):
   id: int
