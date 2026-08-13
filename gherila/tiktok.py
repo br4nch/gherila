@@ -97,9 +97,11 @@ class TikTok:
       headers=self.headers,
     )
     result = REHYDRATION_REGEX.search(data)
-    loaded = munchify(loads(result.group(1))["__DEFAULT_SCOPE__"]["webapp.video-detail"])
+    loaded = munchify(loads(result.group(1))["__DEFAULT_SCOPE__"])
+    return loaded["webapp.biz-context"].keys()
 
     r = loaded.itemInfo.itemStruct
+    return r
     user = await self.get_user(r.author.uniqueId)
     r.author = user
     r.url = r.video.playAddr

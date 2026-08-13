@@ -5,3 +5,13 @@ from .github import GitHub
 from .twitter import Twitter
 from .reddit import Reddit
 from .snapchat import Snapchat
+
+__all__ = [
+  "Brave", 
+  "GitHub", 
+  "Instagram", 
+  "Reddit", 
+  "Snapchat", 
+  "TikTok", 
+  "Twitter"
+]

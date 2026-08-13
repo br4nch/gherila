@@ -1,10 +1,20 @@
 from re import compile
 from orjson import loads
-from munch import munchify, DefaultMunch
+from typing import (
+  Dict,
+  Any
+)
+from munch import (
+  munchify,
+  DefaultMunch
+)
 
 from .http import State
 from .exceptions import Error
-from .models import SnapUser, SnapStory
+from .models import (
+  SnapUser,
+  SnapStory
+)
 
 SNAP_REGEX = compile(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>')
 
@@ -14,7 +24,7 @@ class Snapchat:
     self.headers = {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     }
-    self._user_cache = {}
+    self._user_cache: Dict[str, Any] = {}
 
   async def get_user(self: "Snapchat", username: str):
     """
@@ -24,7 +34,7 @@ class Snapchat:
     ----------
     username : :class:`str`
       The username of the user to fetch the info.
-    
+
     Returns
     -------
     :class:`SnapUser`
@@ -46,12 +56,8 @@ class Snapchat:
     if not error.pageMetadata:
       raise Error(f"Can't find an user with the username `@{username}`.")
 
-    user = {
-      **loaded.userProfile,
-      "spotlightHighlights": loaded.spotlightHighlights,
-    }
     snap_user = SnapUser(
-      **user,
+      **loaded.userProfile,
       username=username,
       url=f"https://story.snapchat.com/add/{username}"
     )
@@ -66,11 +72,11 @@ class Snapchat:
     ----------
     username : :class:`str`
       The username of the user to fetch the stories.
-    
+
     Returns
     -------
     :class:`List[SnapStory]`
-      A list of SnapStory objects with the user stories. 
+      A list of SnapStory objects with the user stories.
     """
     data = await self.session.request(
       "GET",
@@ -102,7 +108,17 @@ class Snapchat:
 
   async def get_highlights(self: "Snapchat", username: str):
     """
-    
+    Get the highlights of a user by username.
+
+    Parameters
+    ----------
+    username : :class:`str`
+      The username of the user to fetch the highlights.
+
+    Returns
+    -------
+    :class:`List[SnapStory]`
+      A list of SnapStory objects with the user highlights.
     """
     data = await self.session.request(
       "GET",

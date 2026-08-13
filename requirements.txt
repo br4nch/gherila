@@ -3,3 +3,4 @@ aiohttp
 munch
 pydantic
 aiofiles
+selectolax

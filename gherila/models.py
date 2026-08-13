@@ -8,12 +8,16 @@ from typing import (
 from pydantic import (
   BaseModel,
   HttpUrl,
+  ConfigDict,
   Field,
   field_validator,
   model_validator
 )
 
-class RedditComment(BaseModel):
+class SocialsModel(BaseModel):
+  model_config = ConfigDict(populate_by_name=True)
+
+class RedditComment(SocialsModel):
   id: str
   author: str
   body: str
@@ -30,17 +34,11 @@ class RedditComment(BaseModel):
       return []
 
     children = v.get("data", {}).get("children", [])
-    comments = []
-
-    for c in children:
-      if c.get("kind") == "t1":
-        comments.append(cls(**c['data']))
-
-    return comments
+    return [cls(**c["data"]) for c in children if c.get("kind") == "t1"]
 
 RedditComment.model_rebuild()
 
-class SubReddit(BaseModel):
+class SubReddit(SocialsModel):
   id: str
   display_name: str
   title: str
@@ -48,11 +46,11 @@ class SubReddit(BaseModel):
   subscribers: int
   created_utc: datetime
   over18: bool
-  community_icon: Optional[str] = None
-  banner_background_image: Optional[str] = None
-  wiki_enabled: Optional[bool] = None
+  community_icon: str | None = None
+  banner_background_image: str | None = None
+  wiki_enabled: bool | None = None
 
-class RedditSearch(BaseModel):
+class _RedditPost(SocialsModel):
   id: str
   author: str
   title: str
@@ -65,11 +63,13 @@ class RedditSearch(BaseModel):
   over_18: bool
   is_video: bool
   is_self: bool
-  post_hint: Optional[str] = None
-  is_gallery: bool = False
-  gallery_data: Optional[dict] = None
-  media: Optional[dict] = None
   created_utc: datetime
+
+class RedditSearch(_RedditPost):
+  post_hint: str | None = None
+  is_gallery: bool = False
+  gallery_data: dict | None = None
+  media: dict | None = None
 
 class RedditUser(BaseModel):
   id: str
@@ -83,61 +83,48 @@ class RedditUser(BaseModel):
   is_gold: bool
   icon_img: HttpUrl
 
-class RedditPost(BaseModel):
-  id: str
-  author: str
-  title: str
-  selftext: str
-  url: str
-  permalink: str
-  ups: int
-  upvote_ratio: float
-  num_comments: int
-  over_18: bool
-  is_video: bool
-  is_self: bool
+class RedditPost(_RedditPost):
   stickied: bool
   spoiler: bool
-  created_utc: datetime
-  thumbnail: Optional[str] = None
-  link_flair_text: Optional[str]
+  thumbnail: str | None = None
+  link_flair_text: str | None = None
   domain: str
-  category: Optional[str]
+  category: str | None = None
   total_awards_received: int
 
-class TwitterUserBiolinks(BaseModel):
+class TwitterUserBiolinks(SocialsModel):
   display_url: str
   expanded_url: str
   url: str
 
-class TwitterUser(BaseModel):
+class TwitterUser(SocialsModel):
   username: str
   id: int
   avatar: str
-  banner: Optional[str]
+  banner: str | None = None
   bio: str
-  display_name: Optional[str]
+  display_name: str | None = None
   location: str
   verified: bool
-  verified_type: Optional[str]
+  verified_type: str | None = None
   created_at: str
   followers: int
   following: int
   posts: int
   liked_posts: int
   tweets: int
-  pinned_tweets: Optional[List[str]]
+  pinned_tweets: List[str] | None = None
   biolinks: List[TwitterUserBiolinks]
   url: str
 
-class TwitterMedia(BaseModel):
+class TwitterMedia(SocialsModel):
   type: str
-  video_url: Optional[str] = None
-  image_url: Optional[str] = None
+  video_url: str | None = None
+  image_url: str | None = None
 
-class TwitterTweet(BaseModel):
+class TwitterTweet(SocialsModel):
   id: int
-  text: Optional[str]
+  text: str | None = None
   author: TwitterUser
   lang: str
   likes: int
@@ -149,88 +136,88 @@ class TwitterTweet(BaseModel):
   views: int
   bookmarks: int
   is_quote: bool
-  quote_url: Optional[str]
-  hashtags: Optional[List[str]]
-  mentions: Optional[List[str]]
+  quote_url: str | None = None
+  hashtags: List[str] | None = None
+  mentions: List[str] | None = None
   media: List[TwitterMedia]
 
-class CommitAuthor(BaseModel):
+class CommitAuthor(SocialsModel):
   name: str
   email: str
   date: datetime
 
-class CommitDetail(BaseModel):
+class CommitDetail(SocialsModel):
   author: CommitAuthor
   message: str
 
-class GitHubCommit(BaseModel):
+class GitHubCommit(SocialsModel):
   sha: str
   html_url: str
   commit: CommitDetail
 
-class GitHubUser(BaseModel):
+class GitHubUser(SocialsModel):
   id: int
   login: str
   avatar_url: HttpUrl
   url: str
   name: str
   type: str
-  company: Optional[str] = None
-  location: Optional[str] = None
-  email: Optional[str] = None
-  bio: Optional[str] = None
+  company: str | None = None
+  location: str | None = None
+  email: str | None = None
+  bio: str | None = None
   public_repos: int
   followers: int
   following: int
   created_at: datetime
 
-class GitHubRepoOwner(BaseModel):
+class GitHubRepoOwner(SocialsModel):
   login: str
   id: int
   avatar_url: HttpUrl
   html_url: HttpUrl
   type: str
 
-class GitHubRepo(BaseModel):
+class GitHubRepo(SocialsModel):
   id: int
   name: str
   private: bool
   owner: GitHubRepoOwner
-  description: Optional[str] = None
+  description: str | None = None
   fork: bool
   url: str
   created_at: datetime
   updated_at: datetime
   stargazers_count: int
   watchers_count: int
-  language: Optional[str]
+  language: str | None = None
   archived: bool
-  topics: List[str] = []
+  topics: List[str] = Field(default_factory=list)
   forks: int
 
-class BraveResult(BaseModel):
+class BraveResult(SocialsModel):
   url: str
   title: str
   description: str
 
-class BraveSearch(BaseModel):
+class BraveSearch(SocialsModel):
   query: str
   results: List[BraveResult]
 
-class BraveImages(BaseModel):
+class BraveImages(SocialsModel):
   query: str
   images: List[HttpUrl]
 
-class TikTokBioLinks(BaseModel):
+class TikTokBioLinks(SocialsModel):
   link: str
 
-class TikTokStats(BaseModel):
+class TikTokStats(SocialsModel):
   following: int = Field(alias="followingCount")
   followers: int = Field(alias="followerCount")
   likes: int = Field(alias="heartCount")
   videos: int = Field(alias="videoCount")
 
-class TikTokUser(BaseModel):
+class TikTokUser(SocialsModel):
   id: int
   username: str = Field(alias="uniqueId")
   nickname: str
@@ -240,14 +227,14 @@ class TikTokUser(BaseModel):
   is_private: bool = Field(alias="privateAccount")
   stats: TikTokStats
 
-class TikTokVideoStats(BaseModel):
+class TikTokVideoStats(SocialsModel):
   likes: int = Field(alias="diggCount")
   shares: int = Field(alias="shareCount")
   comments: int = Field(alias="commentCount")
   plays: int = Field(alias="playCount")
   saves: int = Field(alias="collectCount")
 
-class TikTokVideo(BaseModel):
+class TikTokVideo(SocialsModel):
   id: int
   description: str = Field(alias="desc")
   created: datetime = Field(alias="createTime")
@@ -255,13 +242,13 @@ class TikTokVideo(BaseModel):
   author: TikTokUser
   url: str
 
-class BioLinks(BaseModel):
+class BioLinks(SocialsModel):
   link_id: int
   url: str
-  title: Optional[str] = None
-  is_pinned: Optional[bool] = None
+  title: str | None = None
+  is_pinned: bool | None = None
 
-class InstagramUser(BaseModel):
+class InstagramUser(SocialsModel):
   pk: int
   username: str
   full_name: str
@@ -271,38 +258,38 @@ class InstagramUser(BaseModel):
   followers: int = Field(alias="follower_count")
   following: int = Field(alias="following_count")
   is_business: bool
-  avatar: Optional[HttpUrl] = Field(default=None, alias="profile_pic_url")
-  biography: Optional[str] = None
-  account_type: Optional[int] = None
-  external_url: Optional[str] = None
-  bio_links: List[BioLinks] = []
+  avatar: HttpUrl | None = Field(default=None, alias="profile_pic_url")
+  biography: str | None = None
+  account_type: int | None = None
+  external_url: str | None = None
+  bio_links: List[BioLinks] = Field(default_factory=list)
 
-class InstagramStoryUser(BaseModel):
+class InstagramStoryUser(SocialsModel):
   pk: int
-  username: Optional[str] = None
-  full_name: Optional[str] = None
-  avatar: Optional[HttpUrl] = Field(default=None, alias="profile_pic_url")
-  is_private: Optional[bool] = None
+  username: str | None = None
+  full_name: str | None = None
+  avatar: HttpUrl | None = Field(default=None, alias="profile_pic_url")
+  is_private: bool | None = None
 
-class StoryMention(BaseModel):
+class StoryMention(SocialsModel):
   user_id: int
   username: str
-  avatar: Optional[HttpUrl] = Field(default=None, alias="profile_pic_url")
+  avatar: HttpUrl | None = Field(default=None, alias="profile_pic_url")
 
-class InstagramStory(BaseModel):
+class InstagramStory(SocialsModel):
   id: str
   media_type: int
   taken_at: datetime
   user: InstagramStoryUser
-  image_url: Optional[HttpUrl] = None
-  video_url: Optional[HttpUrl] = None
-  video_duration: Optional[float] = 0.0
-  thumbnail_url: Optional[HttpUrl] = None
-  expiring_at: Optional[datetime] = None
-  mentions: List[StoryMention] = None
-  has_liked: Optional[bool] = False
+  image_url: HttpUrl | None = None
+  video_url: HttpUrl | None = None
+  video_duration: float | None = 0.0
+  thumbnail_url: HttpUrl | None = None
+  expiring_at: datetime | None = None
+  mentions: List[StoryMention] | None = None
+  has_liked: bool | None = False
 
-class InstagramHighlight(BaseModel):
+class InstagramHighlight(SocialsModel):
   id: int
   title: str
   created_at: datetime
@@ -311,7 +298,7 @@ class InstagramHighlight(BaseModel):
   cover_media: str
   user: InstagramStoryUser
 
-class InstagramCommentUser(BaseModel):
+class InstagramCommentUser(SocialsModel):
   pk: int
   username: str
   full_name: str
@@ -319,13 +306,13 @@ class InstagramCommentUser(BaseModel):
   is_private: bool
   is_verified: bool
 
-class InstagramComment(BaseModel):
+class InstagramComment(SocialsModel):
   pk: int
   text: str
   created_at: datetime
   user: InstagramCommentUser
 
-class InstagramMedia(BaseModel):
+class InstagramMedia(SocialsModel):
   pk: int
   id: int
   code: str
@@ -333,32 +320,32 @@ class InstagramMedia(BaseModel):
   taken_at: datetime
   like_count: int
   comment_count: int
-  play_count: Optional[int] = None
-  title: Optional[str] = None
+  play_count: int | None = None
+  title: str | None = None
   user: InstagramStoryUser
-  image_urls: Optional[List[HttpUrl]] = None
-  thumbnail_url: Optional[HttpUrl] = None
-  video_url: Optional[HttpUrl] = None
-  video_duration: Optional[float] = 0.0
+  image_urls: List[HttpUrl] | None = None
+  thumbnail_url: HttpUrl | None = None
+  video_url: HttpUrl | None = None
+  video_duration: float | None = 0.0
 
-class InstagramFollowerUser(BaseModel):
+class InstagramFollowerUser(SocialsModel):
   pk: int
   username: str
   full_name: str
   is_private: bool
   is_verified: bool
-  avatar: Optional[HttpUrl] = Field(default=None, alias="profile_pic_url")
+  avatar: HttpUrl | None = Field(default=None, alias="profile_pic_url")
 
-class SnapUser(BaseModel):
+class SnapUser(SocialsModel):
   display_name: str
-  avatar: Optional[HttpUrl]
+  avatar: HttpUrl | None = None
   username: str
   snapcode: HttpUrl
-  bio: Optional[str]
+  bio: str | None = None
   url: HttpUrl
   subscriber_count: int = 0
-  spotlight_videos: List[HttpUrl] = []
-  banner: Optional[HttpUrl] = Field(default=None, alias="hero_image")
+  spotlight_videos: List[HttpUrl] = Field(default_factory=list)
+  banner: HttpUrl | None = Field(default=None, alias="hero_image")
 
   @model_validator(mode="before")
   @classmethod
@@ -366,49 +353,47 @@ class SnapUser(BaseModel):
     if not isinstance(data, dict) or "$case" not in data:
       return data
 
-    case = data['$case']
+    case = data["$case"]
     mapped = data.copy()
+
     if case == "userInfo":
-      user = data.get('userInfo', {})
+      user = data.get("userInfo", {})
       mapped.update({
-        'display_name': user.get('displayName'),
-        'bio': None,
-        'avatar': user.get("bitmoji3d", {}).get("avatarImage", {}).get("fallbackUrl"),
-        'snapcode': user.get('snapcodeImageUrl', '').replace('&type=SVG', '&type=PNG')
+        "display_name": user.get("displayName"),
+        "bio": None,
+        "avatar": user.get("bitmoji3d", {}).get("avatarImage", {}).get("fallbackUrl"),
+        "snapcode": user.get("snapcodeImageUrl", "").replace("&type=SVG", "&type=PNG")
       })
 
-    elif case == 'publicProfileInfo':
-      user = data.get('publicProfileInfo', {})
-      sub_count = int(user.get('subscriberCount', '0')) if (user.get('subscriberCount', '0')).isdigit() else 0
-      mapped.update({
-        'display_name': user.get('title'),
-        'bio': user.get('bio'),
-        'avatar': user.get('profilePictureUrl'),
-        'snapcode': user.get('snapcodeImageUrl', '').replace('&type=SVG', '&type=PNG'),
-        'hero_image': user.get('squareHeroImageUrl') or None,
-        'subscriber_count': sub_count,
-      })
-      videos = []
-      highlights = data.get('spotlightHighlights', [])
-      for h in highlights:
-        try:
-          url = h.get('snapList', [])[0].get('snapUrls', {}).get('mediaUrl')
-          if url:
-            videos.append(url)
-        except IndexError:
-          continue
+    elif case == "publicProfileInfo":
+      user = data.get("publicProfileInfo", {})
+      sub_count = str(user.get("subscriberCount", "0"))
 
-      mapped['spotlight_videos'] = videos
+      mapped.update({
+        "display_name": user.get("title"),
+        "bio": user.get("bio"),
+        "avatar": user.get("profilePictureUrl"),
+        "snapcode": user.get("snapcodeImageUrl", "").replace("&type=SVG", "&type=PNG"),
+        "hero_image": user.get("squareHeroImageUrl") or None,
+        "subscriber_count": int(sub_count) if sub_count.isdigit() else 0,
+      })
+
+      mapped["spotlight_videos"] = [
+          url
+          for h in data.get("spotlightHighlights", [])
+          if (snaps := h.get("snapList")) 
+          and (url := snaps[0].get("snapUrls", {}).get("mediaUrl"))
+      ]
 
     return mapped
 
-class SnapStoryList(BaseModel):
+class SnapStoryList(SocialsModel):
   url: HttpUrl
   snap_id: str
   preview_url: str
   media_type: int
   timestamp: int
 
-class SnapStory(BaseModel):
-  videos: List[SnapStoryList]
+class SnapStory(SocialsModel):
+  videos: list[SnapStoryList]
   count: int

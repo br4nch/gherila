@@ -1,6 +1,7 @@
 from selectolax.parser import HTMLParser
+from itertools import islice
 from re import (
-  sub,
+  IGNORECASE,
   compile
 )
 
@@ -13,6 +14,7 @@ from .models import (
 )
 
 IMG_PATTERN = compile(r'<img[^>]+src="([^">]+)"')
+URL_PATTERN = compile(r'https?://[^\s]+', IGNORECASE)
 
 class Brave:
   def __init__(self: "Brave"):
@@ -55,15 +57,16 @@ class Brave:
     )
 
     if not (
-      r := [
-        img for img in IMG_PATTERN.findall(data)
-        if img.startswith("https://imgs.search.brave.com/") and "32:32" not in img
-      ]
+      r := (
+        match.group(1) for match in IMG_PATTERN.finditer(data)
+        if match.group(1).startswith("https://imgs.search.brave.com/") 
+        and "32:32" not in match.group(1)
+      )
     ):
       raise Error(f"No images were found for the query `{query}`.")
     
     if limit:
-      r = r[:limit]
+      r = list(islice(r, limit))
 
     return BraveImages(
       query=query,
@@ -102,23 +105,27 @@ class Brave:
     seen = set()
 
     for r in tree.css("a"):
-      url = r.attributes.get("href", "")
-      if not url.startswith("http") or "brave" in url.lower() or url in seen:
+      if len(results) >= limit:
+        break
+
+      url = r.attributes.get("href")
+      if not url or not url.startswith("http"):
         continue
 
-      if len(
-        (
-          title := r.text(strip=True)
-        )
-      ) < 5:
+      if url in seen or "brave" in url.lower():
+        continue
+
+      title = r.text(strip=True)
+      if len(title) < 5:
         continue
 
       description = ""
-      if (
-        content := r.parent.parent if r.parent and r.parent.parent else None
-      ):
-        text = content.text(separator=" ", strip=True)
-        description = sub(r"https?://[^\s]+", "", text.replace(title, "")).strip()
+      parent = r.parent
+      if parent and parent.parent:
+        raw_text = parent.parent.text(separator=" ", strip=True)
+
+        text_no_title = raw_text.replace(title, "")
+        description = URL_PATTERN.sub("", text_no_title).strip()
 
       results.append(
         BraveResult(
@@ -128,9 +135,6 @@ class Brave:
         )
       )
       seen.add(url)
-
-      if len(results) >= limit:
-        break
 
     if not results:
       raise Error(f"No results were found for the query `{query}`.")

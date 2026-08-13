@@ -2,6 +2,10 @@ from re import compile
 from json import dumps
 from urllib.parse import urlparse
 from unicodedata import normalize
+from typing import (
+  Dict,
+  Any
+)
 
 from .exceptions import Error
 from .http import State
@@ -24,6 +28,7 @@ class Twitter:
       "X-Csrf-Token": crsf,
       "Cookie": f"auth_token={auth_token}; ct0={ct0}"
       }
+    self._user_cache: Dict[str, Any] = {}
 
   def _media(self: "Twitter", legacy):
     medias = []
@@ -63,6 +68,9 @@ class Twitter:
     :class:`TwitterUser`
       A TwitterUser object with the found information.
     """
+    if username in self._user_cache:
+      return self._user_cache[username]
+
     data = await self.session.request(
       "GET",
       f"https://x.com/i/api/graphql/IGgvgiOx4QZndDHuD3x9TQ/UserByScreenName",
@@ -116,7 +124,7 @@ class Twitter:
               TwitterUserBiolinks(**link)
             )
 
-    return TwitterUser(
+    obj = TwitterUser(
       username=username,
       id=stats.rest_id,
       avatar=stats.avatar.image_url,
@@ -136,6 +144,8 @@ class Twitter:
       biolinks=biolinks,
       url=f"https://x.com/{username}"
     )
+    self._user_cache[username] = obj
+    return obj
 
   async def get_tweet(self: "Twitter", url: str):
     """
