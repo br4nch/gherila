@@ -7,10 +7,11 @@ setup(
   version='1.2.9',
   license='MIT',
   description='An async package destioned to fetch information from different platforms',
-  python_requires='>=3.9.0',
+  python_requires='>=3.8.0',
   install_requires=['munch', 'aiohttp', 'pydantic', 'orjson', 'aiofiles', 'selectolax'],
   packages=['gherila'],
   classifiers=[
+    'Programming Language :: Python :: 3.8',
     'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
