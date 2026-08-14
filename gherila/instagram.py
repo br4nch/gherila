@@ -26,6 +26,8 @@ from .models import (
 )
 
 INSTAGRAM_REGEX = compile(r"^(?:https?:\/\/)?(?:www\.)?instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]+)")
+BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+BASE64_MAP = {char: i for i, char in enumerate(BASE64_ALPHABET)}
 
 class Instagram:
   def __init__(
@@ -137,18 +139,22 @@ class Instagram:
         ).url
 
       if "story_bloks_stickers" in story:
+        mentions = []
         for sticker in story.story_bloks_stickers:
           bloks = sticker.get("bloks_sticker", {})
           if bloks.get("bloks_sticker_type") == "mention":
             mention = bloks.get("sticker_data", {}).get("ig_mention", {})
             if mention:
-              story.mentions = [
+              mentions.append(
                 {
                   "user_id": mention.get("account_id"),
                   "username": mention.get("username"),
                   "profile_pic_url": mention.get("profile_pic_url"),
                 }
-              ]
+              )
+
+        if mentions:
+          story.mentions = mentions
 
       stories.append(story)
 
@@ -204,12 +210,15 @@ class Instagram:
     :class:`List[InstagramMedia]`
       A list of InstagramMedia objects with the post images/videos.
     """
-    if not INSTAGRAM_REGEX.match(url):
+    if not (
+      match := INSTAGRAM_REGEX.match(url)
+    ):
       raise Error("This is not a valid instagram post url.")
 
-    char = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-    code = [p for p in (urlparse(url).path).split("/") if p][1]
-    media_id = sum(char.index(x) * (len(char) ** i) for i, x in enumerate(reversed(code)))
+    shortcode = match.group(1)
+    media_id = 0
+    for char in shortcode:
+      media_id = (media_id * 64) + BASE64_MAP[char]
 
     data = await self._request(
       "GET",
@@ -299,14 +308,12 @@ class Instagram:
       "GET",
       f"https://i.instagram.com/api/v1/friendships/{user.pk}/followers/",
     )
-    followers = []
-    for f in data.get("users", []):
-      followers.append(InstagramFollowerUser(**f))
 
+    followers = data.get("users", [])
     if amount:
       followers = followers[:amount]
 
-    return followers
+    return [InstagramFollowerUser(**follower) for follower in followers]
 
   async def get_following(self: "Instagram", username: str, amount: Optional[int] = None):
     """
@@ -329,11 +336,9 @@ class Instagram:
       "GET",
       f"https://i.instagram.com/api/v1/friendships/{user.pk}/following/",
     )
-    following = []
-    for f in data.get("users", []):
-      following.append(InstagramFollowerUser(**f))
-
+    
+    following = data.get("users", [])
     if amount:
       following = following[:amount]
 
-    return following
+    return [InstagramFollowerUser(**follower) for follower in following]
