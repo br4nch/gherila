@@ -4,7 +4,7 @@ setup(
   name='gherila',
   author='s4nica',
   url='https://github.com/br4nch/gherila',
-  version='1.2.8',
+  version='1.2.9',
   license='MIT',
   description='An async package destioned to fetch information from different platforms',
   python_requires='>=3.9.0',
