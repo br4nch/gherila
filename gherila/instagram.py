@@ -1,4 +1,3 @@
-from urllib.parse import urlparse
 from re import compile
 from random import (
   uniform,
@@ -275,17 +274,31 @@ class Instagram:
     :class:`List[InstagramComment]`
       A list of InstagramComment object with the post comments.
     """
-    post = await self.get_post(url)
-    data = await self._request(
-      "GET",
-      f"https://www.instagram.com/api/v1/media/{post[0].pk}/comments",
-    )
-    comments = data.get("comments", [])
+    post = (await self.get_post(url))[0].pk
+    comments, min_id = [], ""
+    base_url = f"https://www.instagram.com/api/v1/media/{post}/comments"
 
-    if amount:
-      comments = comments[:amount]
+    while True:
+      data = await self._request(
+        "GET",
+        f"{base_url}?min_id={min_id}"
+        if min_id
+        else base_url
+      )
+      comment = data.get("comments", [])
+      comments.extend(
+        [
+          InstagramComment(**f)
+          for f in (
+            comment[:amount - len(comments)]
+            if amount else comment
+          )
+        ]
+      )
+      min_id = data.get("next_min_id", "")
 
-    return [InstagramComment(**comment) for comment in comments]
+      if not min_id or not comment or (amount and len(comments) >= amount):
+        return comments
 
   async def get_followers(self: "Instagram", username: str, amount: Optional[int] = None):
     """
@@ -303,17 +316,31 @@ class Instagram:
     :class:`List[InstagramFollowerUser]`
       A list of InstagramFollowerUser objects with the user followers.
     """
-    user = await self.get_user(username)
-    data = await self._request(
-      "GET",
-      f"https://i.instagram.com/api/v1/friendships/{user.pk}/followers/",
-    )
+    user_id = (await self.get_user(username)).pk
+    followers, max_id = [], ""
+    base_url = f"https://i.instagram.com/api/v1/friendships/{user_id}/followers/"
 
-    followers = data.get("users", [])
-    if amount:
-      followers = followers[:amount]
+    while True:
+      data = await self._request(
+        "GET",
+        f"{base_url}?max_id={max_id}"
+        if max_id
+        else base_url
+      )
+      users = data.get("users", [])
+      followers.extend(
+        [
+          InstagramFollowerUser(**f)
+          for f in (
+            users[:amount - len(followers)]
+            if amount else users
+          )
+        ]
+      )
+      max_id = data.get("next_max_id", "")
 
-    return [InstagramFollowerUser(**follower) for follower in followers]
+      if not max_id or not users or (amount and len(followers) >= amount):
+        return followers
 
   async def get_following(self: "Instagram", username: str, amount: Optional[int] = None):
     """
@@ -331,14 +358,28 @@ class Instagram:
     :class:`List[InstagramFollowerUser]`
       A list of InstagramFollowerUser objects with the user following.
     """
-    user = await self.get_user(username)
-    data = await self._request(
-      "GET",
-      f"https://i.instagram.com/api/v1/friendships/{user.pk}/following/",
-    )
-    
-    following = data.get("users", [])
-    if amount:
-      following = following[:amount]
+    user_id = (await self.get_user(username)).pk
+    following, max_id = [], ""
+    base_url = f"https://i.instagram.com/api/v1/friendships/{user_id}/following/"
 
-    return [InstagramFollowerUser(**follower) for follower in following]
+    while True:
+      data = await self._request(
+        "GET",
+        f"{base_url}?max_id={max_id}"
+        if max_id
+        else base_url
+      )
+      users = data.get("users", [])
+      following.extend(
+        [
+          InstagramFollowerUser(**f)
+          for f in (
+            users[:amount - len(following)]
+            if amount else users
+          )
+        ]
+      )
+      max_id = data.get("next_max_id", "")
+
+      if not max_id or not users or (amount and len(following) >= amount):
+        return following
