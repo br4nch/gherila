@@ -161,17 +161,17 @@ class Reddit:
 
   async def get_comments(self: "Reddit", url: str):
     """
-    Get a post information by url.
+    Get a list of comments from a post by url.
 
     Parameters
     ----------
     url : :class:`str`
-      The url of the post to fetch the information.
+      The url of the post to fetch the comments.
 
     Returns
     -------
-    :class:`RedditPost`
-      A RedditPost object with the post information.
+    :class:`RedditComment`
+      A list of RedditComment objects with the post comments.
     """
     clean = url.strip().rstrip("/")
     data = await self.session.request(
@@ -183,9 +183,8 @@ class Reddit:
     if getattr(data, "error", None) == 404:
       raise Error(f"No post founded for the url `{url}`.")
 
-    comments = []
-    for c in data[1].data.children:
-      if c.kind == "t1":
-        comments.append(RedditComment(**c.data))
-
-    return comments
+    return [
+      RedditComment(**c.data)
+      for c in data[1].data.children
+      if getattr(c, "kind", None) == "t1"
+    ]

@@ -12,7 +12,8 @@ from .http import State
 from typing import (
   Optional,
   Dict,
-  List
+  List,
+  Any
 )
 from .exceptions import Error
 from .models import (
@@ -55,16 +56,19 @@ class Instagram:
     url: str,
     max_retries: int = 2,
     **kwargs
-  ):
-    async with self.semaphore:
-      for a in range(max_retries):
-        try:
-          kwargs.setdefault("headers", self.headers)
-          if self.proxy:
-            kwargs["proxy"] = self._get_proxy()
+  ) -> Any:
+    kwargs.setdefault("headers", self.headers)
+    if self.proxy:
+      kwargs.setdefault("proxy", self._get_proxy())
+
+    for a in range(max_retries):
+      try:
+        async with self.semaphore:
           return await self.session.request(method, url, **kwargs)
-        except Exception:
-          await sleep(uniform(1.0, 2.5) * (2 ** a))
+      except Exception as e:
+        if a == max_retries - 1:
+          raise Error(f"Request failed ({max_retries}). Error: {e}")
+        await sleep(uniform(1.0, 2.5) * (2 ** a))
 
   async def get_user(self: "Instagram", username: str):
     """

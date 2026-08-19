@@ -56,17 +56,16 @@ class Brave:
       headers=self.headers,
     )
 
-    if not (
-      r := (
-        match.group(1) for match in IMG_PATTERN.finditer(data)
-        if match.group(1).startswith("https://imgs.search.brave.com/") 
-        and "32:32" not in match.group(1)
-      )
-    ):
+    r = []
+    for match in IMG_PATTERN.finditer(data):
+      src = match.group(1)
+      if src.startswith("https://imgs.search.brave.com/") and "32:32" not in src:
+        r.append(src)
+        if len(r) >= limit:
+          break
+
+    if not r:
       raise Error(f"No images were found for the query `{query}`.")
-    
-    if limit:
-      r = list(islice(r, limit))
 
     return BraveImages(
       query=query,
@@ -104,7 +103,7 @@ class Brave:
     results = []
     seen = set()
 
-    for r in tree.css("a"):
+    for r in tree.css('a[href^="http"]'):
       if len(results) >= limit:
         break
 

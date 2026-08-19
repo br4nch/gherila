@@ -66,7 +66,7 @@ class GitHub:
     ----------
     username : :class:`str`
       The username of the github account.
-    
+
     Returns
     -------
     :class:`List[GitHubRepo]`
@@ -76,6 +76,9 @@ class GitHub:
       "GET",
       f"https://api.github.com/users/{username}/repos"
     )
+    if data.status == "404":
+      raise Error(f"There are no repositories for the user `{username}`.")
+
     return [GitHubRepo(**repo) for repo in data]
 
   async def get_commits(self: "GitHub", username: str, repository_name: str):
@@ -88,7 +91,7 @@ class GitHub:
       The username of the github account containing the repository.
     repository_name : :class:`str`
       The repository name from the github account.
-    
+
     Returns
     -------
     :class:`List[GitHubCommit]`
