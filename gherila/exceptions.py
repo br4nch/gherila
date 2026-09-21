@@ -1,4 +1,4 @@
-"""Stable exceptions shared by the Python clients and optional HTTP API."""
+"""Stable exceptions shared by the Python platform clients."""
 
 
 class Error(Exception):

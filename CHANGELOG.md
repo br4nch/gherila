@@ -13,7 +13,6 @@
 - Preserve Instagram carousel slides and stop repeated pagination cursors.
 - Validate platform URLs, encode Reddit queries, handle missing scripts/tweets,
   and accept nullable GitHub display names.
-- Add the optional `gherila[api]` HTTP service, OpenAPI, and language examples.
 - Add deterministic regression tests and cross-platform CI.
 
 ### Migration notes
@@ -26,12 +25,8 @@
   limits slides. Each item selects its best image/video; `image_urls` no longer
   enumerates every resolution. Instagram media `id` is a string because the
   upstream identifier can contain an underscore; `pk` remains an integer.
-- Model JSON serialization emits identifier fields as strings for language
-  interoperability; native Python ID attributes otherwise retain their types.
 - Empty Brave searches return an empty result model instead of raising `Error`.
 - Passing zero for a collection size returns an empty result without a request;
   negative values raise `ValueError`.
 - The standard HTML parser's Brave search descriptions may be empty. Install
   `gherila[fast]` for the selectolax description parser.
-- The API defaults otherwise-unbounded collections to 50 items, caps requested
-  sizes at 500, and does not expose downloads to server filesystem paths.

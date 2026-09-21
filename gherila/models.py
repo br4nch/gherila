@@ -6,7 +6,6 @@ from pydantic import (
     ConfigDict,
     Field,
     HttpUrl,
-    field_serializer,
     field_validator,
     model_validator,
 )
@@ -14,10 +13,6 @@ from pydantic import (
 
 class SocialsModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-
-    @field_serializer("id", "pk", "user_id", check_fields=False, when_used="json")
-    def serialize_identifier(self, value) -> str:
-        return str(value)
 
 
 class RedditComment(SocialsModel):

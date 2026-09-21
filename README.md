@@ -1,7 +1,8 @@
 # gherila
 
 Async Python clients for GitHub, Instagram, TikTok, Twitter/X, Reddit, Snapchat,
-and Brave, with an optional HTTP API for applications written in other languages.
+and Brave. Install the package in your application and call it directly: requests
+run on the user’s machine using their network connection and credentials.
 
 ## Install
 
@@ -13,11 +14,9 @@ release is the compatibility evidence; adding a runner alone does not establish 
 python -m pip install -U gherila
 # Optional JSON/HTML acceleration:
 python -m pip install 'gherila[fast]'
-# Optional HTTP server:
-python -m pip install 'gherila[api]'
 ```
 
-For an unreleased checkout, run `python -m pip install -e '.[api,dev]'` instead.
+For an unreleased checkout, run `python -m pip install -e '.[dev]'` instead.
 On Windows Command Prompt, use double quotes around package extras.
 
 The base installation uses standard-library JSON and HTML parsing. `orjson` and
@@ -89,70 +88,23 @@ closing the client cancels pending shared lookups. Failures are not cached.
 Retries and redirects can make a whole operation exceed one request timeout.
 For an operation deadline, use `asyncio.wait_for(...)`.
 
-## Other languages: HTTP + JSON
+## Local wrapper and language support
 
-Run the server on any supported Python host:
+Gherila is a Python library, not a hosted service. Your application creates a
+client and calls its methods directly; no gherila server, account, port, or
+separate background process is needed. Platform requests still require internet
+access and, where applicable, the user's own platform credentials.
 
-```sh
-gherila-api --host 127.0.0.1 --port 8000
-```
+Linux, Windows, and macOS are operating-system targets. Programming-language
+support is separate: a Python package cannot be imported natively by JavaScript,
+Go, Java, C#, or other languages. Native support for those languages would require
+separate wrappers/packages or explicit language bindings. This release focuses
+on the local Python wrapper and does not add a server as a substitute.
 
-- Interactive documentation: `http://127.0.0.1:8000/docs`
-- OpenAPI schema: `http://127.0.0.1:8000/openapi.json`
-- Health check: `http://127.0.0.1:8000/health`
-
-Any language with an HTTP client can use the API. The library itself remains
-Python; other languages communicate with the server instead of importing it.
-You can also generate language-specific clients from the OpenAPI schema.
-
-```sh
-curl --fail 'http://127.0.0.1:8000/v1/github/get_user?username=br4nch'
-```
-
-JavaScript (Node.js with built-in fetch, or a browser using a same-origin proxy):
-
-```javascript
-const response = await fetch(
-  'http://127.0.0.1:8000/v1/github/get_user?username=br4nch'
-);
-if (!response.ok) throw new Error(`HTTP ${response.status}`);
-const user = await response.json();
-console.log(user.login, user.id);
-```
-
-Examples for Go, Java, C#, PHP, and Ruby are in [docs/languages.md](docs/languages.md).
-
-JSON identifiers (`id`, `pk`, and `user_id`) are strings to avoid losing precision
-in languages with limited numeric precision. Python model attributes keep their
-native types. API query arguments are described by OpenAPI; collection sizes
-are capped at 500 and otherwise-unbounded methods default to 50 in the API.
-The Python clients permit larger collections and expose GitHub async iterators.
-
-### Server credentials and access
-
-Configure credentials in the server environment, never in request URLs:
-
-| Platform | Environment variables |
-|---|---|
-| GitHub | `GITHUB_TOKEN` (optional) |
-| Instagram | `INSTAGRAM_CSRF`, `INSTAGRAM_SESSION_ID` |
-| TikTok | `TIKTOK_TTWID`, `TIKTOK_MS_TOKEN` |
-| Twitter/X | `TWITTER_AUTH_TOKEN`, `TWITTER_CT0`, `TWITTER_CSRF`, `TWITTER_AUTHORIZATION` |
-| Reddit, Snapchat, Brave | No credentials configured by this adapter |
-
-Unconfigured authenticated platforms return HTTP 503. Platform operations use
-`/v1/{platform}/{method}`, for example `/v1/instagram/get_post?url=...`.
-Local filesystem downloads are intentionally available only in the Python client.
-
-Set `GHERILA_API_KEY` to require an `X-API-Key` header. The CLI requires this key
-when binding to a non-loopback address. Use HTTPS through a reverse proxy for
-remote deployment. The server represents one set of platform accounts and is
-intended for trusted applications, not a public multi-tenant scraping service.
-CORS is not enabled by default. Health/docs/schema contain no account credentials.
-
-The API has a 60-second operation deadline and a concurrency limit of 32.
-Applications can customize these using `gherila.api.create_app(...)`.
-The app owns and closes any clients passed to `create_app(clients=...)`.
+Credentials are supplied to the client constructors. `GitHub(token=...)` is
+optional; Instagram, TikTok, and Twitter require their existing credential
+arguments. Avoid hardcoding secrets in source code; environment variables or
+your application's secret configuration work well.
 
 ## Errors and platform limits
 
@@ -177,7 +129,7 @@ photo posts without a playable video raise `ParseError`.
 ## Development
 
 ```sh
-python -m pip install -e '.[api,dev]'
+python -m pip install -e '.[dev]'
 python -m pytest -q
 ruff check .
 ruff format --check .

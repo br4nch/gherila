@@ -37,7 +37,7 @@ async def test_github_cache_coalesces_and_returns_independent_models(github_user
         user.login = "changed"
         cached = await client.get_user("example")
         assert cached.login == "example"
-        assert cached.model_dump(mode="json")["id"] == "9007199254740993"
+        assert cached.model_dump(mode="json")["id"] == 9007199254740993
     with pytest.raises(RuntimeError):
         await client.get_user("example")
 
