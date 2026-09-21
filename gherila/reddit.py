@@ -1,190 +1,97 @@
-from .http import State
-from .exceptions import Error
-from .models import (
-  SubReddit,
-  RedditUser,
-  RedditPost,
-  RedditSearch,
-  RedditComment
-)
+from urllib.parse import quote, urlsplit, urlunsplit
 
-class Reddit:
-  def __init__(self: "Reddit"):
-    self.session = State()
-    self.headers = {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    }
+from ._utils import validate_amount, validate_url
+from .cache import coalesce_user
+from .client import Client
+from .exceptions import ParseError
+from .models import RedditComment, RedditPost, RedditSearch, RedditUser, SubReddit
 
-  async def get_subreddit(self: "Reddit", name: str):
-    """
-    Get a subreddit information by name.
+REDDIT_HOSTS = {"reddit.com", "www.reddit.com", "old.reddit.com", "new.reddit.com", "m.reddit.com"}
 
-    Parameters
-    ----------
-    name : :class:`str`
-      The name of the subreddit to fetch the information.
 
-    Returns
-    -------
-    :class:`SubReddit`
-      A SubReddit object with the subreddit information.
-    """
-    data = await self.session.request(
-      "GET",
-      f"https://www.reddit.com/r/{name}/about.json?raw_json=1",
-      headers=self.headers,
-    )
+class Reddit(Client):
+    def __init__(self, **options):
+        super().__init__(**options)
+        self.headers = {"User-Agent": "gherila/1.4 (async Python client)"}
 
-    if data.error == 404:
-      raise Error(f"No subreddit founded for the name `{name}`.")
+    async def _request(self, path, **params):
+        url = (
+            path
+            if path.startswith("https://") or path.startswith("http://")
+            else f"https://www.reddit.com/{path}"
+        )
+        return await self.session.request(
+            "GET",
+            url,
+            headers=self.headers,
+            params={"raw_json": 1, **params},
+            response_type="json",
+            allowed_hosts=REDDIT_HOSTS,
+        )
 
-    return SubReddit(**data.data)
+    @staticmethod
+    def _post_url(url):
+        parts = urlsplit(validate_url(url, REDDIT_HOSTS))
+        path = parts.path.rstrip("/")
+        if not path.endswith(".json"):
+            path += ".json"
+        return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
 
-  async def get_subreddit_posts(
-    self: "Reddit",
-    name: str,
-    sort: str = "new",
-    limit: int = 10
-  ):
-    """
-    Get a subreddit's posts by name.
+    async def get_subreddit(self, name: str) -> SubReddit:
+        data = await self._request(f"r/{quote(name, safe='')}/about.json")
+        return SubReddit(**data.data)
 
-    Parameters
-    ----------
-    name : :class:`str`
-      The name of the subreddit to fetch the posts.
-    sort : :class:`str`
-      The sorting method for the posts. Can be "new", "hot" or "top". Default is "new".
-    limit : :class:`int`
-      The number of posts to fetch. Default is 10.
+    async def _listing(self, path, model, limit, **params):
+        validate_amount(limit)
+        results, cursor, seen = [], None, set()
+        while len(results) < limit:
+            data = await self._request(
+                path, limit=min(100, limit - len(results)), after=cursor or "", **params
+            )
+            listing = data.get("data") or {}
+            children = listing.get("children") or []
+            results.extend(model(**item["data"]) for item in children[: limit - len(results)])
+            cursor = listing.get("after")
+            if not cursor or not children or len(results) >= limit:
+                break
+            if cursor in seen:
+                raise ParseError("Reddit pagination repeated a cursor")
+            seen.add(cursor)
+        return results
 
-    Returns
-    -------
-    :class:`RedditPost`
-      A list of RedditPost objects with the subreddit posts..
-    """
-    data = await self.session.request(
-      "GET",
-      f"https://www.reddit.com/r/{name}/{sort}.json?limit={limit}&raw_json=1",
-      headers=self.headers,
-    )
+    async def get_subreddit_posts(
+        self, name: str, sort: str = "new", limit: int = 10
+    ) -> list[RedditPost]:
+        if sort not in {"new", "hot", "top", "rising", "controversial"}:
+            raise ValueError("Unsupported subreddit sort")
+        return await self._listing(f"r/{quote(name, safe='')}/{sort}.json", RedditPost, limit)
 
-    if data.error == 404:
-      raise Error(f"No subreddit founded for the name `{name}`.")
-    
-    return [RedditPost(**c.data) for c in data.data.children]
+    async def get_post(self, url: str) -> RedditPost:
+        data = await self._request(self._post_url(url))
+        try:
+            return RedditPost(**data[0]["data"]["children"][0]["data"])
+        except (IndexError, KeyError, TypeError) as exc:
+            raise ParseError("Reddit post data are missing") from exc
 
-  async def get_post(self: "Reddit", url: str):
-    """
-    Get a post information by url.
+    @coalesce_user
+    async def get_user(self, username: str) -> RedditUser:
+        data = await self._request(f"user/{quote(username, safe='')}/about.json")
+        user = RedditUser(**data.data)
+        self._user_cache[username] = user
+        return user
 
-    Parameters
-    ----------
-    url : :class:`str`
-      The url of the post to fetch the information.
+    async def search(
+        self, query: str, sort: str = "relevance", limit: int = 10
+    ) -> list[RedditSearch]:
+        if sort not in {"relevance", "hot", "top", "new", "comments"}:
+            raise ValueError("Unsupported search sort")
+        return await self._listing("search.json", RedditSearch, limit, q=query, sort=sort)
 
-    Returns
-    -------
-    :class:`RedditPost`
-      A RedditPost object with the post information.
-    """
-    clean = url.strip().rstrip("/")
-    data = await self.session.request(
-      "GET",
-      clean + ".json?raw_json=1",
-      headers=self.headers,
-    )
-
-    if getattr(data, "error", None) == 404:
-      raise Error(f"No post founded for the url `{url}`.")
-
-    return RedditPost(**data[0].data.children[0].data)
-  
-  async def get_user(self: "Reddit", username: str):
-    """
-    Get user information by username.
-
-    Parameters
-    ----------
-    username : :class:`str`
-      The username of the user to fetch the information.
-
-    Returns
-    -------
-    :class:`RedditUser`
-      A RedditUser object with the user information.
-    """
-    data = await self.session.request(
-      "GET",
-      f"https://www.reddit.com/user/{username}/about.json?raw_json=1",
-      headers=self.headers,
-    )
-
-    if data.error == 404:
-      raise Error(f"No user founded for the username `{username}`.")
-
-    return RedditUser(**data.data)
-  
-  async def search(
-    self: "Reddit",
-    query: str,
-    sort: str = "relevance",
-    limit: int = 10
-  ):
-    """
-    Search for posts matching a query.
-
-    Parameters
-    ----------
-    query : :class:`str`
-      The search query to look for.
-    sort : :class:`str`
-      The sorting method for the search results. Can be "relevance", "hot", "top" or "new". Default is "relevance".
-    limit : :class:`int`
-      The number of searches results to fetch. Default is 10.
-
-    Returns
-    -------
-    List[:class:`RedditSearch`]
-      A list of RedditSearch objects matching the query.
-    """
-    data = await self.session.request(
-      "GET",
-      f"https://www.reddit.com/search.json?q={query}&sort={sort}&limit={limit}&raw_json=1",
-      headers=self.headers,
-    )
-
-    if not data.data.children:
-      raise Error(f"No results found for the query `{query}`.")
-
-    return [RedditSearch(**c.data) for c in data.data.children]
-
-  async def get_comments(self: "Reddit", url: str):
-    """
-    Get a list of comments from a post by url.
-
-    Parameters
-    ----------
-    url : :class:`str`
-      The url of the post to fetch the comments.
-
-    Returns
-    -------
-    :class:`RedditComment`
-      A list of RedditComment objects with the post comments.
-    """
-    clean = url.strip().rstrip("/")
-    data = await self.session.request(
-      "GET",
-      clean + ".json?raw_json=1",
-      headers=self.headers,
-    )
-
-    if getattr(data, "error", None) == 404:
-      raise Error(f"No post founded for the url `{url}`.")
-
-    return [
-      RedditComment(**c.data)
-      for c in data[1].data.children
-      if getattr(c, "kind", None) == "t1"
-    ]
+    async def get_comments(self, url: str) -> list[RedditComment]:
+        """Return comments included in the response; Reddit 'more' placeholders are not expanded."""
+        data = await self._request(self._post_url(url))
+        try:
+            children = data[1]["data"]["children"]
+            return [RedditComment(**item["data"]) for item in children if item.get("kind") == "t1"]
+        except (IndexError, KeyError, TypeError) as exc:
+            raise ParseError("Reddit comment data are missing") from exc

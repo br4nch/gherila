@@ -1,0 +1,66 @@
+name: Tests
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        include:
+          - os: ubuntu-24.04-arm
+            python: '3.12'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e ".[api,dev]"
+      - run: python -m pytest -q
+      - run: python -m pip check
+  accelerated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e ".[api,dev,fast]"
+      - run: python -m pytest -q
+  minimum-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: python -m pip install -e ".[api,dev]" "aiohttp==3.10.0" "pydantic==2.7.0" "aiofiles==23.2.1" "fastapi==0.115.0" "uvicorn==0.30.0" "httpx==0.27.0"
+      - run: python -m pytest -q
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install build ruff
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: python -m build
+      - name: Install wheel outside checkout
+        run: |
+          python -m venv /tmp/gherila-wheel
+          /tmp/gherila-wheel/bin/python -m pip install dist/*.whl
+          cd /tmp
+          /tmp/gherila-wheel/bin/python -I -c "from gherila import Brave, GitHub, Instagram, Reddit, Snapchat, TikTok, Twitter; print('All adapters import without optional extras')"
+      - name: Install source distribution outside checkout
+        run: |
+          python -m venv /tmp/gherila-sdist
+          /tmp/gherila-sdist/bin/python -m pip install dist/*.tar.gz
+          cd /tmp
+          /tmp/gherila-sdist/bin/python -I -c "from gherila import GitHub; print(GitHub)"

@@ -1,147 +1,76 @@
-from re import compile
-from orjson import loads
-from typing import Dict
-from munch import (
-  munchify,
-  DefaultMunch
-)
+from urllib.parse import quote
 
-from .http import State
-from .exceptions import Error
-from .models import (
-  SnapUser,
-  SnapStory
-)
+from ._utils import script_json
+from .cache import coalesce_user
+from .client import Client
+from .exceptions import NotFoundError, ParseError
+from .models import SnapStory, SnapUser
 
-SNAP_REGEX = compile(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>')
 
-class Snapchat:
-  def __init__(self: "Snapchat"):
-    self.session = State()
-    self.headers = {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    }
-    self._user_cache: Dict[str, SnapUser] = {}
+class Snapchat(Client):
+    def __init__(self, **options):
+        super().__init__(**options)
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
 
-  async def get_user(self: "Snapchat", username: str):
-    """
-    Get user information by username.
+    async def _page(self, username):
+        html = await self.session.request(
+            "GET",
+            f"https://story.snapchat.com/add/{quote(username, safe='')}",
+            headers=self.headers,
+            response_type="text",
+            allowed_hosts={"story.snapchat.com", "www.snapchat.com", "snapchat.com"},
+        )
+        props = script_json(html, "__NEXT_DATA__").get("props", {}).get("pageProps")
+        if not isinstance(props, dict):
+            raise ParseError("Snapchat page data are missing")
+        if not props.get("pageMetadata"):
+            raise NotFoundError("Snapchat user was not found", status=404)
+        return props
 
-    Parameters
-    ----------
-    username : :class:`str`
-      The username of the user to fetch the info.
+    @coalesce_user
+    async def get_user(self, username: str) -> SnapUser:
+        props = await self._page(username)
+        if not isinstance(props.get("userProfile"), dict):
+            raise ParseError("Snapchat profile data are missing")
+        user = SnapUser(
+            **{
+                **props["userProfile"],
+                "username": username,
+                "url": f"https://story.snapchat.com/add/{quote(username, safe='')}",
+            }
+        )
+        self._user_cache[username] = user
+        return user
 
-    Returns
-    -------
-    :class:`SnapUser`
-      A SnapUser object with the user information.
-    """
-    if username in self._user_cache:
-      return self._user_cache[username]
+    @staticmethod
+    def _stories(snaps):
+        try:
+            videos = [
+                {
+                    "url": snap["snapUrls"]["mediaUrl"],
+                    "snap_id": snap["snapId"]["value"],
+                    "preview_url": snap["snapUrls"]["mediaPreviewUrl"]["value"],
+                    "media_type": snap["snapMediaType"],
+                    "timestamp": snap["timestampInSec"]["value"],
+                }
+                for snap in snaps
+            ]
+        except (KeyError, TypeError) as exc:
+            raise ParseError("Snapchat story format changed") from exc
+        return SnapStory(videos=videos, count=len(videos))
 
-    data = await self.session.request(
-      "GET",
-      f"https://story.snapchat.com/add/{username}",
-      headers=self.headers,
-    )
-    d = SNAP_REGEX.search(data)
-    munch = loads(d.group(1))["props"]["pageProps"]
-    error = DefaultMunch(None, munch)
-    loaded = munchify(munch)
+    async def get_story(self, username: str) -> SnapStory:
+        props = await self._page(username)
+        return self._stories((props.get("story") or {}).get("snapList") or [])
 
-    if not error.pageMetadata:
-      raise Error(f"Can't find an user with the username `@{username}`.")
-
-    snap_user = SnapUser(
-      **loaded.userProfile,
-      username=username,
-      url=f"https://story.snapchat.com/add/{username}"
-    )
-    self._user_cache[username] = snap_user
-    return snap_user
-
-  async def get_story(self: "Snapchat", username: str):
-    """
-    Get the stories of a user by username.
-
-    Parameters
-    ----------
-    username : :class:`str`
-      The username of the user to fetch the stories.
-
-    Returns
-    -------
-    :class:`List[SnapStory]`
-      A list of SnapStory objects with the user stories.
-    """
-    data = await self.session.request(
-      "GET",
-      f"https://story.snapchat.com/add/{username}",
-      headers=self.headers,
-    )
-    d = SNAP_REGEX.search(data)
-    munch = loads(d.group(1))["props"]["pageProps"]
-    error = DefaultMunch(None, munch)
-    loaded = munchify(munch)
-
-    if not error.pageMetadata:
-      raise Error(f"Can't find an user with the username `@{username}`.")
-
-    stories = [
-      {
-        "url": snap.snapUrls.mediaUrl,
-        "snap_id": snap.snapId.value,
-        "preview_url": snap.snapUrls.mediaPreviewUrl.value,
-        "media_type": snap.snapMediaType,
-        "timestamp": snap.timestampInSec.value
-      }
-      for snap in loaded.story.snapList
-    ]
-    return SnapStory(
-      videos=stories,
-      count=len(stories)
-    )
-
-  async def get_highlights(self: "Snapchat", username: str):
-    """
-    Get the highlights of a user by username.
-
-    Parameters
-    ----------
-    username : :class:`str`
-      The username of the user to fetch the highlights.
-
-    Returns
-    -------
-    :class:`List[SnapStory]`
-      A list of SnapStory objects with the user highlights.
-    """
-    data = await self.session.request(
-      "GET",
-      f"https://story.snapchat.com/add/{username}",
-      headers=self.headers,
-    )
-    d = SNAP_REGEX.search(data)
-    munch = loads(d.group(1))["props"]["pageProps"]
-    error = DefaultMunch(None, munch)
-    loaded = munchify(munch)
-
-    if not error.pageMetadata:
-      raise Error(f"Can't find an user with the username `@{username}`.")
-
-    highlights = [
-      {
-        "url": snap.snapUrls.mediaUrl,
-        "snap_id": snap.snapId.value,
-        "preview_url": snap.snapUrls.mediaPreviewUrl.value,
-        "media_type": snap.snapMediaType,
-        "timestamp": snap.timestampInSec.value
-      }
-      for h in loaded.spotlightHighlights
-      for snap in h.snapList
-    ]
-    return SnapStory(
-      videos=highlights,
-      count=len(highlights)
-    )
+    async def get_highlights(self, username: str) -> SnapStory:
+        props = await self._page(username)
+        return self._stories(
+            [
+                snap
+                for highlight in props.get("spotlightHighlights") or []
+                for snap in highlight.get("snapList") or []
+            ]
+        )

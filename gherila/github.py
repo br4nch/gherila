@@ -1,107 +1,80 @@
-from .http import State
-from .models import (
-  GitHubUser,
-  GitHubRepo,
-  GitHubCommit
-)
-from .exceptions import Error
+from urllib.parse import quote
 
-class GitHub:
-  def __init__(self: "GitHub"):
-    self.session = State()
+from ._utils import validate_amount
+from .cache import coalesce_user
+from .client import Client
+from .exceptions import ParseError
+from .models import GitHubCommit, GitHubRepo, GitHubUser
 
-  async def get_user(self: "GitHub", username: str):
-    """
-    Get user information by provided username.
 
-    Parameters
-    ----------
-    username : :class:`str`
-      The username of the investigated user.
+class GitHub(Client):
+    def __init__(self, token: str | None = None, **options):
+        super().__init__(**options)
+        self.headers = {"Accept": "application/vnd.github+json", "User-Agent": "gherila"}
+        if token:
+            self.headers["Authorization"] = f"Bearer {token}"
 
-    Returns
-    -------
-    :class:`GitHubUser`
-      A GitHubUser object with the user info.
-    """
-    data = await self.session.request(
-      "GET",
-      f"https://api.github.com/users/{username}"
-    )
-    if data.status == "404":
-      raise Error(f"Can't find an user with the username `{username}`.")
+    async def _request(self, path, **kwargs):
+        return await self.session.request(
+            "GET",
+            f"https://api.github.com/{path}",
+            headers=self.headers,
+            response_type="json",
+            **kwargs,
+        )
 
-    return GitHubUser(**data)
+    @coalesce_user
+    async def get_user(self, username: str) -> GitHubUser:
+        """Get a user; repeated lookups use a bounded TTL cache."""
+        data = await self._request(f"users/{quote(username, safe='')}")
+        user = GitHubUser(**data)
+        self._user_cache[username] = user
+        return user
 
-  async def get_repo(self: "GitHub", username: str, repo_name: str):
-    """
-    Get repository information by the provided github username and repository name.
+    async def get_repo(self, username: str, repo_name: str) -> GitHubRepo:
+        """Get a repository by owner and name."""
+        data = await self._request(f"repos/{quote(username, safe='')}/{quote(repo_name, safe='')}")
+        return GitHubRepo(**data)
 
-    Parameters
-    ----------
-    username : :class:`str`
-      The username of the repository owner.
-    repo_name : :class:`str`
-      The name of the repository you want to fetch.
+    async def _pages(self, path, model, limit):
+        validate_amount(limit)
+        count, page = 0, 1
+        previous = None
+        while limit is None or count < limit:
+            data = await self._request(path, params={"per_page": 100, "page": page})
+            if not isinstance(data, list):
+                raise ParseError("Expected a GitHub list response")
+            if not data:
+                return
+            marker = tuple(item.get("id", item.get("sha")) for item in data)
+            if marker == previous:
+                raise ParseError("GitHub pagination repeated a page")
+            previous = marker
+            for item in data:
+                yield model(**item)
+                count += 1
+                if limit is not None and count >= limit:
+                    return
+            if len(data) < 100:
+                return
+            page += 1
 
-    Returns
-    -------
-    :class:`GitHubRepo`
-      A GitHubRepo object with the repository information.
-    """
-    data = await self.session.request(
-      "GET",
-      f"https://api.github.com/repos/{username}/{repo_name}"
-    )
-    if data.status == "404":
-      raise Error(f"Can't find a repository with the name `{repo_name}` for the user `{username}`.")
+    async def iter_repos(self, username: str, limit: int | None = None):
+        """Yield repositories across pages without buffering the full collection."""
+        async for repo in self._pages(f"users/{quote(username, safe='')}/repos", GitHubRepo, limit):
+            yield repo
 
-    return GitHubRepo(**data)
+    async def get_repos(self, username: str, limit: int | None = None) -> list[GitHubRepo]:
+        """Get repositories across pages, optionally bounded by limit."""
+        return [repo async for repo in self.iter_repos(username, limit)]
 
-  async def get_repos(self: "GitHub", username: str):
-    """
-    Get all the repositories for the given username.
+    async def iter_commits(self, username: str, repository_name: str, limit: int | None = None):
+        path = f"repos/{quote(username, safe='')}/{quote(repository_name, safe='')}/commits"
+        async for commit in self._pages(path, GitHubCommit, limit):
+            yield commit
 
-    Parameters
-    ----------
-    username : :class:`str`
-      The username of the github account.
-
-    Returns
-    -------
-    :class:`List[GitHubRepo]`
-      A list of GitHubRepo objects containing the repository info.
-    """
-    data = await self.session.request(
-      "GET",
-      f"https://api.github.com/users/{username}/repos"
-    )
-    if data.status == "404":
-      raise Error(f"There are no repositories for the user `{username}`.")
-
-    return [GitHubRepo(**repo) for repo in data]
-
-  async def get_commits(self: "GitHub", username: str, repository_name: str):
-    """
-    Get the commits from a github repo
-
-    Parameters
-    ----------
-    username : :class:`str`
-      The username of the github account containing the repository.
-    repository_name : :class:`str`
-      The repository name from the github account.
-
-    Returns
-    -------
-    :class:`List[GitHubCommit]`
-      A list of GitHubCommit objects containing the commits from a repository.
-    """
-    data = await self.session.request(
-      "GET",
-      f"https://api.github.com/repos/{username}/{repository_name}/commits",
-    )
-    if data.status == '404':
-      raise Error(f"There is no repository named `{repository_name}` for the user `{username}`.")
-
-    return [GitHubCommit(**commit) for commit in data]
+    async def get_commits(
+        self, username: str, repository_name: str, limit: int | None = None
+    ) -> list[GitHubCommit]:
+        """Get commits across pages, optionally bounded by limit."""
+        return [commit async for commit in self.iter_commits(username, repository_name, limit)]

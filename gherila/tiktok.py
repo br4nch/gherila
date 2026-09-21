@@ -1,140 +1,84 @@
-import aiofiles
-
-from pathlib import Path
 from io import BytesIO
-from re import compile
-from orjson import loads
-from munch import munchify
-from typing import Dict
+from pathlib import Path
+from urllib.parse import quote
 
-from .http import State
-from .exceptions import Error
-from .models import (
-  TikTokUser,
-  TikTokStats,
-  TikTokVideo
-)
+from ._utils import script_json, validate_url
+from .cache import coalesce_user
+from .client import Client
+from .exceptions import NotFoundError, ParseError
+from .models import TikTokUser, TikTokVideo
 
-TIKTOK_REGEX = compile(r"^.*https:\/\/(?:m|www|vm)?\.?tiktok\.com\/((?:.*\b(?:(?:v|embed|photo|video|t)\/|\?shareId=|\&item_id=)(\d+))|\w+)")
-REHYDRATION_REGEX = compile(r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>')
+TIKTOK_HOSTS = {"tiktok.com", "www.tiktok.com", "m.tiktok.com", "vm.tiktok.com", "vt.tiktok.com"}
 
-class TikTok:
-  def __init__(self: "TikTok", ttwid: str, msToken: str):
-    self.session = State()
-    self.headers = {
-      "Cookie": f"ttwid={ttwid}; msToken={msToken}",
-      "Referer": "https://www.tiktok.com/",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-      "Accept-Encoding": "gzip, deflate, br",
-      "Sec-Fetch-Dest": "document",
-      "Sec-Fetch-Mode": "navigate",
-      "Sec-Fetch-Site": "same-origin",
-      "Sec-Fetch-User": "?1",
-      "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-      "Sec-Ch-Ua-Mobile": "?0",
-      "Sec-Ch-Ua-Platform": '"Windows"',
-      "Upgrade-Insecure-Requests": "1",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    }
-    self._user_cache: Dict[str, TikTokUser] = {}
 
-  async def get_user(self: "TikTok", username: str):
-    """
-    Get user information by username.
+class TikTok(Client):
+    def __init__(self, ttwid: str, msToken: str, **options):
+        super().__init__(**options)
+        self.headers = {
+            "Cookie": f"ttwid={ttwid}; msToken={msToken}",
+            "Referer": "https://www.tiktok.com/",
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "en-US,en;q=0.9",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        }
 
-    Parameters
-    ----------
-    username : :class:`str`
-      The username of the user to fetch the info.
+    async def _detail(self, url, key):
+        html = await self.session.request(
+            "GET",
+            validate_url(url, TIKTOK_HOSTS),
+            headers=self.headers,
+            response_type="text",
+            allowed_hosts=TIKTOK_HOSTS,
+        )
+        scope = script_json(html, "__UNIVERSAL_DATA_FOR_REHYDRATION__").get("__DEFAULT_SCOPE__", {})
+        detail = scope.get(key)
+        if not isinstance(detail, dict):
+            raise ParseError(f"TikTok page is missing {key}")
+        if detail.get("statusCode") == 10221:
+            raise NotFoundError("TikTok resource was not found", status=404)
+        if detail.get("statusCode", 0) != 0:
+            raise ParseError("TikTok returned an unavailable or restricted resource")
+        return detail
 
-    Returns
-    -------
-    :class:`TikTokUser`
-      A TikTokUser object with the user information.
-    """
-    if username in self._user_cache:
-      return self._user_cache[username]
+    @coalesce_user
+    async def get_user(self, username: str) -> TikTokUser:
+        detail = await self._detail(
+            f"https://www.tiktok.com/@{quote(username, safe='')}", "webapp.user-detail"
+        )
+        info = detail.get("userInfo") or {}
+        if not info.get("user") or not isinstance(info.get("stats"), dict):
+            raise ParseError("TikTok user data or statistics are missing")
+        user = TikTokUser(**{**info["user"], "stats": info["stats"]})
+        self._user_cache[username] = user
+        return user
 
-    data = await self.session.request(
-      "GET",
-      f"https://www.tiktok.com/@{username}",
-      headers=self.headers,
-    )
-    result = REHYDRATION_REGEX.search(data)
-    raw = loads(result.group(1))["__DEFAULT_SCOPE__"]["webapp.user-detail"]
-    loaded = munchify(raw)
+    async def get_video(self, url: str) -> TikTokVideo:
+        """Return video metadata from the page's video-detail payload."""
+        detail = await self._detail(url, "webapp.video-detail")
+        item = (detail.get("itemInfo") or {}).get("itemStruct")
+        if not isinstance(item, dict):
+            raise ParseError("TikTok video data are missing")
+        media_url = (item.get("video") or {}).get("playAddr")
+        if not isinstance(media_url, str) or not media_url:
+            raise ParseError("TikTok post has no playable video")
+        author = item.get("author") or {}
+        if item.get("authorStats"):
+            user = TikTokUser(**{**author, "stats": item["authorStats"]})
+        elif author.get("uniqueId"):
+            user = await self.get_user(author["uniqueId"])
+        else:
+            raise ParseError("TikTok video author is missing")
+        return TikTokVideo(**{**item, "author": user, "url": media_url})
 
-    if loaded.statusCode == 10221:
-      raise Error(f"Can't find an user with the username `@{username}`.")
-
-    stats = TikTokStats(**loaded.userInfo.stats)
-    loaded.userInfo.user.stats = stats
-    obj = TikTokUser(**loaded.userInfo.user)
-    self._user_cache[username] = obj
-    return obj
-
-  async def get_video(self: "TikTok", url: str):
-    """
-    Get video data based on the given url.
-
-    Parameters
-    ----------
-    url : :class:`str`
-      The tiktok video url.
-
-    Returns
-    -------
-    :class:`TikTokVideo`
-      A TikTokVideo object containing the video information.
-    """
-    if not TIKTOK_REGEX.match(url):
-      raise Error("This is not a valid tiktok url.")
-
-    data = await self.session.request(
-      "GET",
-      url,
-      headers=self.headers,
-    )
-    result = REHYDRATION_REGEX.search(data)
-    loaded = munchify(loads(result.group(1))["__DEFAULT_SCOPE__"])
-    return loaded["webapp.biz-context"].keys()
-
-    r = loaded.itemInfo.itemStruct
-    return r
-    user = await self.get_user(r.author.uniqueId)
-    r.author = user
-    r.url = r.video.playAddr
-    return TikTokVideo(**r)
-
-  async def download_video(self: "TikTok", video: TikTokVideo, path: str | Path | None) -> Path | BytesIO:
-    """
-    Download a tiktok video.
-
-    Parameters
-    ----------
-    video : :class:`TikTokVideo`
-      The TikTokVideo object to download.
-    path : :class:`str` | :class:`Path` | None
-      The path to save the video. If None, it will return a BytesIO object.
-
-    Returns
-    -------
-    :class:`Path` | :class:`BytesIO`
-      The path to the downloaded video or a BytesIO object if path is None.
-    """
-    video_data = await self.session.request(
-      "GET",
-      video.url,
-      headers=self.headers,
-    )
-
-    if path:
-      save_path = Path(path)
-
-      async with aiofiles.open(save_path, "wb") as f:
-        await f.write(video_data)
-
-      return save_path
-    else:
-      return BytesIO(video_data)
+    async def download_video(
+        self, video: TikTokVideo, path: str | Path | None = None
+    ) -> Path | BytesIO:
+        """Stream to disk or return bounded in-memory bytes; never send account cookies to a CDN."""
+        return await self.session.download(
+            validate_url(video.url),
+            path,
+            headers={
+                "User-Agent": self.headers["User-Agent"],
+                "Referer": "https://www.tiktok.com/",
+            },
+        )

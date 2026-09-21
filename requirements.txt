@@ -1,6 +1,2 @@
-orjson
-aiohttp
-munch
-pydantic
-aiofiles
-selectolax
+# Install the base project using its canonical dependency metadata.
+.
