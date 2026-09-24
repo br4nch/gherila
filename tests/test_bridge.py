@@ -169,18 +169,27 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
 
   async def test_concurrency_is_bounded(self):
     active = peak = 0
+    started = asyncio.Event()
+    release = asyncio.Event()
     async def mocked(self, username: str):
       nonlocal active, peak
       active += 1
       peak = max(peak, active)
-      await asyncio.sleep(0.01)
+      if active == 3:
+        started.set()
+      await release.wait()
       active -= 1
       return username
     source = io.BytesIO(b'\n'.join(json.dumps({"id": i, "platform": "github",
       "method": "get_user", "args": ["test"]}).encode() for i in range(12)))
     target = io.BytesIO()
     with patch.object(GitHub, "get_user", mocked):
-      await run(source, target, concurrency=3)
+      task = asyncio.create_task(run(source, target, concurrency=3))
+      try:
+        await asyncio.wait_for(started.wait(), 5)
+      finally:
+        release.set()
+        await task
     self.assertEqual(peak, 3)
     self.assertEqual(len(target.getvalue().splitlines()), 12)
 
