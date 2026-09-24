@@ -1,5 +1,5 @@
 # Local runtime bootstrap shared by every language. Never reads protocol stdin.
-param([switch]$PrintPython, [Parameter(ValueFromRemainingArguments=$true)][string[]]$BridgeArgs)
+param([switch]$PrintPython, [Parameter(ValueFromRemainingArguments=$true)][string[]]$BridgeArgs = @())
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)

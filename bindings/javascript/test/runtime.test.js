@@ -103,6 +103,13 @@ test('explicit install and first use share setup; CLI and native clients reuse i
     env: { ...process.env, ...offline }, timeout: 30000,
   });
   assert.deepEqual(JSON.parse(setup.stdout), installed);
+  const streamed = exec(command, args.slice(0, -1), {
+    env: { ...process.env, ...offline }, timeout: 30000,
+  });
+  streamed.child.stdin.end('{"id":"launcher","op":"describe"}\n');
+  const reply = JSON.parse((await streamed).stdout);
+  assert.equal(reply.id, 'launcher');
+  assert.equal(reply.result.protocol, 1);
 
   if (process.env.GHERILA_TEST_NATIVE === '1') {
     const build = join(directory, 'build');
