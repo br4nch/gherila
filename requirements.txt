@@ -1,6 +1,6 @@
 orjson
 aiohttp
 munch
-pydantic
+pydantic>=2
 aiofiles
 selectolax

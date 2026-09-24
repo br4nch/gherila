@@ -97,11 +97,13 @@ class TikTok:
       headers=self.headers,
     )
     result = REHYDRATION_REGEX.search(data)
+    if not result:
+      raise Error("TikTok did not return video data.")
     loaded = munchify(loads(result.group(1))["__DEFAULT_SCOPE__"])
-    return loaded["webapp.biz-context"].keys()
-
-    r = loaded.itemInfo.itemStruct
-    return r
+    detail = loaded.get("webapp.video-detail", {})
+    r = detail.get("itemInfo", {}).get("itemStruct")
+    if not r:
+      raise Error("TikTok did not return an available video.")
     user = await self.get_user(r.author.uniqueId)
     r.author = user
     r.url = r.video.playAddr

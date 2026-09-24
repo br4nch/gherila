@@ -1,0 +1,19 @@
+{
+  "name": "@gherila/client",
+  "version": "0.1.0",
+  "description": "Local JavaScript and TypeScript bindings for Gherila",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "bin": {"gherila-runtime": "./cli.js"},
+  "exports": {".": {"types": "./index.d.ts", "import": "./index.js"}},
+  "files": ["index.js", "index.d.ts", "runtime.js", "cli.js", "runtime/", "README.md", "LICENSE"],
+  "engines": {"node": ">=18"},
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "prepack": "node ../../tools/package-runtime.mjs",
+    "postinstall": "node ./cli.js install"
+  },
+  "license": "MIT",
+  "repository": {"type": "git", "url": "https://github.com/br4nch/gherila.git", "directory": "bindings/javascript"}
+}
