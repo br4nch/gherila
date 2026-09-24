@@ -1,17 +1,27 @@
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 // Java 11+, using only the standard library. Parse the response with your JSON library.
 public class GherilaExample {
   public static void main(String[] args) throws Exception {
     String python = System.getenv("GHERILA_PYTHON");
-    if (python == null || python.isEmpty()) {
-      python = System.getProperty("os.name").toLowerCase().contains("win") ? "python" : "python3";
+    List<String> command;
+    if (python != null && !python.isEmpty()) {
+      command = List.of(python, "-u", "-m", "gherila");
+    } else {
+      String launcher = System.getenv("GHERILA_LAUNCHER");
+      if (System.getProperty("os.name").toLowerCase().contains("win")) {
+        command = List.of("powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+          launcher == null ? "runtime/gherila.ps1" : launcher);
+      } else {
+        command = List.of("/bin/sh", launcher == null ? "runtime/gherila.sh" : launcher);
+      }
     }
     String request = System.getenv("GHERILA_REQUEST");
     if (request == null) {
       request = "{\"id\":\"example\",\"platform\":\"github\",\"method\":\"get_user\",\"kwargs\":{\"username\":\"octocat\"}}";
     }
-    Process process = new ProcessBuilder(python, "-u", "-m", "gherila")
+    Process process = new ProcessBuilder(command)
       .redirectError(ProcessBuilder.Redirect.INHERIT).start();
     try {
       try (var input = process.getOutputStream()) {

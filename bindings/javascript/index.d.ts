@@ -5,11 +5,16 @@ export type Value = null | boolean | number | bigint | string | Uint8Array | Val
 export type Fields = { [key: string]: Value };
 export type Model = { [key: string]: Value };
 export interface Options {
+  /** Use an existing Python with Gherila installed; bypasses automatic setup. */
   python?: string;
+  /** Automatically set up a private Python and Gherila when python is omitted. Default: true. */
+  autoInstall?: boolean;
+  /** First-run setup timeout in milliseconds. Default: 300000. */
+  setupTimeout?: number;
   pythonArgs?: string[];
   cwd?: string;
   env?: Record<string, string>;
-  /** Client response timeout, including queue time, in milliseconds. Default: 65000. */
+  /** Response timeout after runtime setup, including queue time, in milliseconds. Default: 65000. */
   timeout?: number;
   /** Python provider call timeout in seconds. Default: 60. */
   callTimeout?: number;

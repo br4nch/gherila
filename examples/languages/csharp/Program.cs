@@ -2,17 +2,29 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 
-var python = Environment.GetEnvironmentVariable("GHERILA_PYTHON")
-  ?? (OperatingSystem.IsWindows() ? "python" : "python3");
+var python = Environment.GetEnvironmentVariable("GHERILA_PYTHON");
+var launcher = Environment.GetEnvironmentVariable("GHERILA_LAUNCHER");
+string executable;
+string[] arguments;
+if (!string.IsNullOrEmpty(python)) {
+  executable = python;
+  arguments = new[] { "-u", "-m", "gherila" };
+} else if (OperatingSystem.IsWindows()) {
+  executable = "powershell.exe";
+  arguments = new[] { "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", launcher ?? "runtime/gherila.ps1" };
+} else {
+  executable = "/bin/sh";
+  arguments = new[] { launcher ?? "runtime/gherila.sh" };
+}
 var request = Environment.GetEnvironmentVariable("GHERILA_REQUEST")
   ?? JsonSerializer.Serialize(new {
     id = "example", platform = "github", method = "get_user", kwargs = new { username = "octocat" }
   });
-var info = new ProcessStartInfo(python) {
+var info = new ProcessStartInfo(executable) {
   UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true,
   StandardInputEncoding = new UTF8Encoding(false), StandardOutputEncoding = Encoding.UTF8,
 };
-foreach (var argument in new[] { "-u", "-m", "gherila" }) info.ArgumentList.Add(argument);
+foreach (var argument in arguments) info.ArgumentList.Add(argument);
 using var process = Process.Start(info) ?? throw new Exception("Could not start Gherila.");
 var output = process.StandardOutput.ReadToEndAsync();
 await process.StandardInput.WriteLineAsync(request);

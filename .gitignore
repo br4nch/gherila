@@ -221,6 +221,7 @@ main.py
 
 # Local language clients and examples
 node_modules/
+bindings/javascript/runtime/
 *.tgz
 *.class
 examples/languages/csharp/bin/

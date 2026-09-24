@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import { prepareRuntime } from './runtime.js';
 
 export class GherilaError extends Error {
   constructor({ code, message, type }) {
@@ -53,21 +54,38 @@ export class Gherila {
   #closing = false;
   #failure;
   #closePromise;
+  #ready;
+  #setup = new AbortController();
 
   constructor({
-    python = process.env.GHERILA_PYTHON || (process.platform === 'win32' ? 'python' : 'python3'),
+    python = process.env.GHERILA_PYTHON,
     pythonArgs = [], cwd, env = {}, timeout = 65000, callTimeout = 60,
-    concurrency = 8, maxPending = 256,
+    concurrency = 8, maxPending = 256, autoInstall = true, setupTimeout = 300000,
   } = {}) {
     if (!Number.isFinite(timeout) || timeout <= 0 || !Number.isFinite(callTimeout) || callTimeout <= 0 ||
-        !Number.isInteger(concurrency) || concurrency < 1 || !Number.isInteger(maxPending) || maxPending < 1) {
+        !Number.isInteger(concurrency) || concurrency < 1 || !Number.isInteger(maxPending) || maxPending < 1 ||
+        !Number.isFinite(setupTimeout) || setupTimeout <= 0 || typeof autoInstall !== 'boolean') {
       throw new TypeError('Timeouts, concurrency and maxPending must be positive.');
     }
     this.#timeout = timeout;
     this.#maxPending = maxPending;
+    this.#ready = this.#start({ python, pythonArgs, cwd, env, autoInstall, setupTimeout, concurrency, callTimeout });
+    // Surface startup errors through calls, without unhandled promise rejections.
+    this.#ready.catch(error => this.#fail(error));
+  }
+
+  async #start({ python, pythonArgs, cwd, env, autoInstall, setupTimeout, concurrency, callTimeout }) {
+    const childEnv = { ...process.env, ...env, PYTHONIOENCODING: 'utf-8' };
+    const managed = !python && autoInstall;
+    if (managed) {
+      python = await prepareRuntime({ env: childEnv, cwd, timeout: setupTimeout, signal: this.#setup.signal });
+      pythonArgs = ['-I', '-X', 'utf8', ...pythonArgs];
+    }
+    python ||= process.platform === 'win32' ? 'python' : 'python3';
+    if (this.#closing) return;
     this.#process = spawn(python, [...pythonArgs, '-u', '-m', 'gherila',
       '--concurrency', String(concurrency), '--timeout', String(callTimeout)], {
-      cwd, env: { ...process.env, ...env, PYTHONIOENCODING: 'utf-8' },
+      cwd, env: childEnv,
       stdio: ['pipe', 'pipe', 'inherit'], windowsHide: true, shell: false,
     });
     this.#ended = new Promise(resolve => {
@@ -112,6 +130,7 @@ export class Gherila {
   }
 
   async request(request) {
+    if (!this.#process) await this.#ready;
     if (this.#failure) throw this.#failure;
     if (this.#closing) throw new Error('Gherila is closed.');
     if (this.#pending.size >= this.#maxPending) throw new Error('Too many pending Gherila requests.');
@@ -151,8 +170,11 @@ export class Gherila {
   close() {
     if (this.#closePromise) return this.#closePromise;
     this.#closing = true;
-    this.#process.stdin.end();
+    if (!this.#process) this.#setup.abort();
+    else this.#process.stdin.end();
     this.#closePromise = (async () => {
+      await this.#ready.catch(() => {});
+      if (!this.#process) return;
       const timer = setTimeout(() => this.#process.kill(), 5000);
       try { await this.#ended; }
       finally { clearTimeout(timer); }

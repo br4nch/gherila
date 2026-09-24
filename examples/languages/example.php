@@ -1,11 +1,19 @@
 <?php
 // PHP 7.4+ supports argument arrays, avoiding shell quoting on every OS.
-$python = getenv('GHERILA_PYTHON') ?: (PHP_OS_FAMILY === 'Windows' ? 'python' : 'python3');
+$python = getenv('GHERILA_PYTHON');
+if ($python) {
+  $command = [$python, '-u', '-m', 'gherila'];
+} elseif (PHP_OS_FAMILY === 'Windows') {
+  $command = ['powershell.exe', '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+    getenv('GHERILA_LAUNCHER') ?: __DIR__ . '/../../runtime/gherila.ps1'];
+} else {
+  $command = ['/bin/sh', getenv('GHERILA_LAUNCHER') ?: __DIR__ . '/../../runtime/gherila.sh'];
+}
 $request = getenv('GHERILA_REQUEST') ?: json_encode([
   'id' => 'example', 'platform' => 'github', 'method' => 'get_user',
   'kwargs' => ['username' => 'octocat'],
 ], JSON_THROW_ON_ERROR);
-$process = proc_open([$python, '-u', '-m', 'gherila'], [
+$process = proc_open($command, [
   0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => STDERR,
 ], $pipes);
 if (!is_resource($process)) { throw new RuntimeException('Could not start Gherila.'); }

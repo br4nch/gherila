@@ -1,7 +1,10 @@
 # Local language protocol (version 1)
 
-Run `python -u -m gherila` or the installed `gherila` command on the same machine
-as your application. Write UTF-8 JSON objects, one per line, to stdin; read UTF-8
+For automatic Python installation, start `sh runtime/gherila.sh` on Linux/macOS,
+or `powershell.exe -NoProfile -ExecutionPolicy Bypass -File runtime/gherila.ps1`
+on Windows. They prepare a private runtime and execute this exact interface.
+Python users can also run `python -u -m gherila` or the installed `gherila` command.
+See [automatic setup](../runtime/README.md). Write UTF-8 JSON objects, one per line, to stdin; read UTF-8
 response objects, one per line, from stdout. Diagnostics go to stderr. Each request
 must fit in 8 MiB including its newline. No listening port, shared service or
 network connection is used between your application and the worker. The providers

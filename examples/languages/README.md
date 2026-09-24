@@ -1,9 +1,9 @@
 # Language examples
 
-Install this checkout first with `python -m pip install .`. Set `GHERILA_PYTHON`
-to the Python executable containing Gherila if it is not the default `python3`
-(`python` on Windows). The examples run locally and use the same provider methods
-as Python. Credentials and request parameters are sent over stdin.
+No Python installation step is needed. Each example invokes the shared launcher,
+which automatically sets up private Python and Gherila on first use. Later calls
+reuse the cached runtime. The examples run locally and use the same provider
+methods as Python. Credentials and request parameters are sent over stdin.
 
 Run these commands from the repository root:
 
@@ -31,3 +31,11 @@ stdin waits for pending calls and exits. The JavaScript client handles this for 
 The same protocol can be used from Rust, C/C++, Swift, Kotlin, Dart, Lua, R,
 PowerShell, and other languages with process execution and JSON support. This
 repository does not claim a tested native SDK for each of those languages.
+
+The launcher is `runtime/gherila.sh` on Linux/macOS (`/bin/sh` executes it) and
+`runtime/gherila.ps1` on Windows (PowerShell executes it). It does not require
+Node to run. Set `GHERILA_LAUNCHER` to use a relocated portable launcher, or
+`GHERILA_PYTHON` to use a preconfigured Python and skip setup. JavaScript chooses
+its bundled launcher automatically and supports an explicit `python` option.
+`GHERILA_CACHE_DIR` sets the private cache location; `GHERILA_OFFLINE=1` requires
+a previously prepared runtime. See [automatic setup](../../runtime/README.md).

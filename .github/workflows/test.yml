@@ -25,7 +25,7 @@ jobs:
           node-version: '20'
       - run: python -m pip install . build
       - run: python -m unittest discover -s tests -v
-      - run: node --test bindings/javascript/test/client.test.js
+      - run: node --test bindings/javascript/test/client.test.js bindings/javascript/test/runtime.test.js
         env:
           GHERILA_PYTHON: python
       - run: python -m build
@@ -41,13 +41,10 @@ jobs:
   examples:
     runs-on: ubuntu-latest
     env:
-      GHERILA_PYTHON: python
       GHERILA_REQUEST: '{"id":"example","op":"describe"}'
+      GHERILA_CACHE_DIR: ${{ runner.temp }}/gherila-examples
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
@@ -58,12 +55,35 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - run: python -m pip install .
       - run: go run examples/languages/main.go
       - run: java examples/languages/GherilaExample.java
       - run: dotnet run --project examples/languages/csharp
       - run: php examples/languages/example.php
       - run: ruby examples/languages/example.rb
+
+  automatic-runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Package and install the client without Python or install hooks
+        shell: bash
+        working-directory: bindings/javascript
+        run: |
+          npm pack --pack-destination "${RUNNER_TEMP}"
+          npm install --ignore-scripts --no-package-lock --prefix "${RUNNER_TEMP}/gherila-consumer" "${RUNNER_TEMP}/gherila-client-0.1.0.tgz"
+      - name: Test first use, concurrent setup and offline reuse
+        run: node --test bindings/javascript/test/runtime.test.js
+        env:
+          GHERILA_TEST_SETUP: '1'
+          GHERILA_TEST_CLIENT: ${{ runner.temp }}/gherila-consumer/node_modules/@gherila/client/index.js
 
   typescript:
     runs-on: ubuntu-latest

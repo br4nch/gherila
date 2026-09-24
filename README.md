@@ -6,13 +6,15 @@ Gherila runs on your machine and fetches data directly from those platforms.
 Python applications use the existing async classes. Other languages can call the
 same implementations through a local subprocess exchanging newline-delimited JSON.
 This provides access from any language with process execution and JSON support;
-it is not a separate native implementation for every language. Python 3.10+ is
-required on the host. Linux, Windows and macOS are covered by the test workflow.
+it is not a separate native implementation for every language. The provided
+clients and launchers automatically install a private Python runtime and Gherila
+on first use, then reuse the cache. Users of other languages do not need to install
+Python manually. Linux, Windows and macOS are covered by the test workflow.
 
 ## Installation
 
-The bridge and JavaScript client are new in this checkout. Install from the source
-containing these changes until they are included in a PyPI release:
+For Python applications, install from the source containing these changes until
+they are included in a PyPI release (Python 3.10+):
 
 ```sh
 python -m pip install .
@@ -39,6 +41,8 @@ asyncio.run(main())
 
 Install the included client with `npm install ./bindings/javascript` from your
 application, adjusting the path to this checkout. It is not yet published to npm.
+There is no Python installation step. The first call sets up a private Python
+3.13 environment with the same Gherila source included in the client package.
 
 ```js
 import { Gherila } from '@gherila/client';
@@ -59,8 +63,11 @@ See [client options and authentication](bindings/javascript/README.md).
 
 ## Other languages
 
-Start `python -u -m gherila`, send one JSON object per stdin line, and read one
-response per stdout line. The installed `gherila` command does the same thing.
+Start `sh runtime/gherila.sh` on Linux/macOS or
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -File runtime/gherila.ps1` on
+Windows. These launchers set up Python and Gherila automatically. Send one JSON
+object per stdin line and read one response per stdout line. The existing
+`python -u -m gherila` and `gherila` commands remain available to Python users.
 
 ```json
 {"id":"1","platform":"github","method":"get_user","kwargs":{"username":"octocat"}}
@@ -68,17 +75,18 @@ response per stdout line. The installed `gherila` command does the same thing.
 
 The reply has `result` or `error`, plus the matching `id` and `version: 1`.
 Keep the process open for repeated calls. Use `create` for persistent authenticated
-clients. `python -m gherila --describe` lists every available method and argument.
+clients. Pass `--describe` to the launcher to list every method and argument.
 
 | Integration | Included |
 | --- | --- |
 | Python | Existing async classes and Pydantic models |
 | JavaScript / TypeScript | Local client with typed methods for all seven providers |
-| Go, Java, C#, PHP, Ruby | Runnable examples using the same JSON protocol |
-| Other languages | Documented process/JSON interface |
+| Go, Java, C#, PHP, Ruby | Runnable examples with automatic runtime setup |
+| Other languages | Shared automatic launcher and documented process/JSON interface |
 
-See [the protocol](docs/bridge.md) and [language examples](examples/languages).
-This interface requires a host that can run Python subprocesses; browser-only and
+See [automatic setup](runtime/README.md), [the protocol](docs/bridge.md) and
+[language examples](examples/languages). First use needs internet access and a
+writable user cache. The host must allow local processes; browser-only and
 restricted mobile/WebAssembly environments need a host-side integration.
 
 The bridge shares Python's upstream behavior, credentials, limits and platform

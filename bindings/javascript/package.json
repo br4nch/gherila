@@ -6,9 +6,9 @@
   "main": "./index.js",
   "types": "./index.d.ts",
   "exports": {".": {"types": "./index.d.ts", "import": "./index.js"}},
-  "files": ["index.js", "index.d.ts", "README.md", "LICENSE"],
+  "files": ["index.js", "index.d.ts", "runtime.js", "runtime/", "README.md", "LICENSE"],
   "engines": {"node": ">=18"},
-  "scripts": {"test": "node --test test/*.test.js"},
+  "scripts": {"test": "node --test test/*.test.js", "prepack": "node ../../tools/package-runtime.mjs"},
   "license": "MIT",
   "repository": {"type": "git", "url": "https://github.com/br4nch/gherila.git", "directory": "bindings/javascript"}
 }
