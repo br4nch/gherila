@@ -33,7 +33,8 @@ $sha = [System.Security.Cryptography.SHA256]::Create()
 try { $key = [BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($hashes))).Replace('-', '').ToLowerInvariant() }
 finally { $sha.Dispose() }
 $marker = Join-Path $cache "environments/$target-$key.txt"
-$python = if (Test-Path $marker) { (Get-Content $marker -Raw).Trim() } else { '' }
+# Windows PowerShell defaults to ANSI for BOM-less files; markers are UTF-8.
+$python = if (Test-Path $marker) { [IO.File]::ReadAllText($marker, [Text.Encoding]::UTF8).Trim() } else { '' }
 
 if (!$python -or !(Test-Path $python)) {
   $uvDir = Join-Path $cache "uv/$version/$target"
