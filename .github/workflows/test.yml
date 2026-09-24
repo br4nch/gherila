@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GHERILA_REQUEST: '{"id":"example","op":"describe"}'
-      GHERILA_CACHE_DIR: ${{ runner.temp }}/gherila-examples
+      GHERILA_CACHE_DIR: ${{ github.workspace }}/.gherila-example-runtime
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
