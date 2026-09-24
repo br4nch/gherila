@@ -218,3 +218,10 @@ __marimo__/
 # misc 
 
 main.py
+
+# Local language clients and examples
+node_modules/
+*.tgz
+*.class
+examples/languages/csharp/bin/
+examples/languages/csharp/obj/

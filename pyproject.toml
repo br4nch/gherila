@@ -7,10 +7,8 @@ name = "gherila"
 authors = [{ name="s4nica" }]
 description = "An async package destioned to fetch information from different platforms"
 readme = "README.md"
-requires-python = ">=3.8.0"
+requires-python = ">=3.10"
 classifiers = [
-  'Programming Language :: Python :: 3.8',
-  'Programming Language :: Python :: 3.9',
   'Programming Language :: Python :: 3.10',
   'Programming Language :: Python :: 3.11',
   'Programming Language :: Python :: 3.12',
@@ -20,6 +18,9 @@ classifiers = [
 ]
 license = { file = "LICENSE" }
 dynamic = ["version", "dependencies"]
+
+[project.scripts]
+gherila = "gherila.bridge:main"
 
 [project.urls]
 Issues = "https://github.com/br4nch/gherila/issues"
