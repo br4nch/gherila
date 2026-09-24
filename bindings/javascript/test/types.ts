@@ -1,6 +1,10 @@
-import { Gherila, type Model } from '../index.js';
+import { Gherila, install, type Installation, type Model } from '../index.js';
 
 async function example() {
+  const runtime: Installation = await install({ timeout: 300000, signal: new AbortController().signal });
+  const executable: string = runtime.python;
+  // @ts-expect-error Install timeout must be numeric.
+  await install({ timeout: 'slow' });
   const api = new Gherila();
   try {
     const github = await api.create('github');
@@ -15,7 +19,7 @@ async function example() {
     await github.get_user({ name: 'octocat' });
     // @ts-expect-error Unknown provider.
     await api.create('unknown');
-    return { user, bytes, file };
+    return { user, bytes, file, executable };
   } finally { await api.close(); }
 }
 

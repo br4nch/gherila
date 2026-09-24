@@ -3,6 +3,9 @@
 For automatic Python installation, start `sh runtime/gherila.sh` on Linux/macOS,
 or `powershell.exe -NoProfile -ExecutionPolicy Bypass -File runtime/gherila.ps1`
 on Windows. They prepare a private runtime and execute this exact interface.
+Add `install` to either launcher to prepare everything and return a JSON runtime
+report without starting the request loop. This is a launcher command, not a
+protocol operation sent over stdin. See [installation from other languages](../runtime/README.md#install-from-any-language).
 Python users can also run `python -u -m gherila` or the installed `gherila` command.
 See [automatic setup](../runtime/README.md). Write UTF-8 JSON objects, one per line, to stdin; read UTF-8
 response objects, one per line, from stdout. Diagnostics go to stderr. Each request

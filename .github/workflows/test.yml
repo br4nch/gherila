@@ -55,11 +55,11 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - run: go run examples/languages/main.go
-      - run: java examples/languages/GherilaExample.java
-      - run: dotnet run --project examples/languages/csharp
-      - run: php examples/languages/example.php
-      - run: ruby examples/languages/example.rb
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: dotnet build examples/languages/csharp --nologo
+      - run: node tools/test-language-installs.mjs
 
   automatic-runtime:
     strategy:
@@ -79,11 +79,22 @@ jobs:
         run: |
           npm pack --pack-destination "${RUNNER_TEMP}"
           npm install --ignore-scripts --no-package-lock --prefix "${RUNNER_TEMP}/gherila-consumer" "${RUNNER_TEMP}/gherila-client-0.1.0.tgz"
-      - name: Test first use, concurrent setup and offline reuse
+      - name: Test explicit install, concurrent first use, offline reuse and C/C++/Rust
         run: node --test bindings/javascript/test/runtime.test.js
         env:
           GHERILA_TEST_SETUP: '1'
+          GHERILA_TEST_NATIVE: '1'
           GHERILA_TEST_CLIENT: ${{ runner.temp }}/gherila-consumer/node_modules/@gherila/client/index.js
+      - name: Verify npm install prepares Python before any client call
+        shell: bash
+        env:
+          GHERILA_CACHE_DIR: ${{ runner.temp }}/gherila-npm-hook-runtime
+        run: |
+          npm install --foreground-scripts --no-package-lock --prefix "${RUNNER_TEMP}/gherila-hook-consumer" "${RUNNER_TEMP}/gherila-client-0.1.0.tgz"
+          cd "${RUNNER_TEMP}/gherila-hook-consumer"
+          export GHERILA_OFFLINE=1
+          export HTTPS_PROXY=http://127.0.0.1:9 HTTP_PROXY=http://127.0.0.1:9
+          npx --no-install gherila-runtime install
 
   typescript:
     runs-on: ubuntu-latest
@@ -92,7 +103,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install --no-save --package-lock=false typescript@5 @types/node@20
+      - run: npm install --ignore-scripts --no-save --package-lock=false typescript@5 @types/node@20
         working-directory: bindings/javascript
       - run: npx tsc --noEmit --strict --target es2020 --module nodenext --moduleResolution nodenext test/types.ts
         working-directory: bindings/javascript

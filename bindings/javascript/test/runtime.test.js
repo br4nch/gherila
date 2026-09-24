@@ -1,15 +1,29 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { Gherila } from '../index.js';
+import { Gherila, install } from '../index.js';
 
 const exec = promisify(execFile);
 const root = fileURLToPath(new URL('../../../', import.meta.url));
+
+test('explicit install rejects offline setup failures and pre-cancelled requests', async () => {
+  const cache = await mkdtemp(join(tmpdir(), 'gherila-install-'));
+  const options = { env: { GHERILA_CACHE_DIR: cache, GHERILA_OFFLINE: '1' } };
+  try {
+    await assert.rejects(install({ ...options, signal: AbortSignal.abort() }), /cancelled/);
+    assert.deepEqual(await readdir(cache), [], 'Cancelled setup must not start an installer.');
+    await assert.rejects(install({ ...options, timeout: 0 }), /timeout/i);
+    await assert.rejects(install(options), /first setup needs internet/);
+    await assert.rejects(exec(process.execPath, [join(root, 'bindings/javascript/cli.js'), 'install'], {
+      env: { ...process.env, ...options.env }, timeout: 30000,
+    }), error => error.code === 1 && !error.stdout.trim() && /first setup needs internet/.test(error.stderr));
+  } finally { await rm(cache, { recursive: true, force: true }); }
+});
 
 test('automatic setup errors reject callers and allow close', async () => {
   const cache = await mkdtemp(join(tmpdir(), 'gherila-offline-'));
@@ -27,7 +41,7 @@ test('closing during automatic setup settles pending calls', async () => {
   await rm(cache, { recursive: true, force: true });
 });
 
-test('packaged client installs private Python, shares setup, and works offline from cache', {
+test('explicit install and first use share setup; CLI and native clients reuse it offline', {
   skip: process.env.GHERILA_TEST_SETUP !== '1', timeout: 600000,
 }, async () => {
   const directory = await mkdtemp(join(tmpdir(), 'gherila setup ü '));
@@ -44,12 +58,14 @@ test('packaged client installs private Python, shares setup, and works offline f
   };
   const module = process.env.GHERILA_TEST_CLIENT
     ? await import(pathToFileURL(resolve(process.env.GHERILA_TEST_CLIENT)).href)
-    : { Gherila };
-  const clients = [0, 1].map(() => new module.Gherila({ python: '', env, timeout: 5000 }));
+    : { Gherila, install };
+  const client = new module.Gherila({ python: '', env, timeout: 5000 });
   try {
-    const results = await Promise.all(clients.map(client => client.describe()));
-    for (const result of results) assert.equal(Object.keys(result.platforms).length, 7);
-  } finally { await Promise.all(clients.map(client => client.close())); }
+    const [installed, described] = await Promise.all([module.install({ env }), client.describe()]);
+    assert.ok(installed.python.startsWith(cache));
+    assert.equal(installed.protocol, 1);
+    assert.equal(Object.keys(described.platforms).length, 7);
+  } finally { await client.close(); }
 
   const markers = await readdir(join(cache, 'environments'));
   assert.ok(markers.length >= 1);
@@ -59,6 +75,17 @@ test('packaged client installs private Python, shares setup, and works offline f
   assert.ok(probe.stdout.split('\n').every(line => !line.trim() || line.startsWith(cache)));
 
   const offline = { ...env, GHERILA_OFFLINE: '1', HTTPS_PROXY: 'http://127.0.0.1:9', HTTP_PROXY: 'http://127.0.0.1:9' };
+  const environments = await readdir(join(cache, 'envs'));
+  const installed = await module.install({ env: offline });
+  assert.equal(installed.python, python);
+  assert.deepEqual(await readdir(join(cache, 'envs')), environments, 'Repeated install must reuse an environment.');
+  const direct = await exec(installed.python, [...installed.args, '--describe']);
+  assert.equal(JSON.parse(direct.stdout).protocol, 1);
+
+  const entrypoint = process.env.GHERILA_TEST_CLIENT || join(root, 'bindings/javascript/index.js');
+  const cli = join(resolve(entrypoint), '..', 'cli.js');
+  const cliResult = await exec(process.execPath, [cli, 'install'], { env: { ...process.env, ...offline }, timeout: 30000 });
+  assert.deepEqual(JSON.parse(cliResult.stdout), installed);
   const api = new module.Gherila({ python: '', env: offline });
   try { assert.equal((await api.describe()).protocol, 1); }
   finally { await api.close(); }
@@ -72,5 +99,39 @@ test('packaged client installs private Python, shares setup, and works offline f
     : [join(runtime, 'gherila.sh'), '--describe'];
   const described = await exec(command, args, { env: { ...process.env, ...offline }, timeout: 30000 });
   assert.equal(JSON.parse(described.stdout).protocol, 1);
+  const setup = await exec(command, [...args.slice(0, -1), 'install'], {
+    env: { ...process.env, ...offline }, timeout: 30000,
+  });
+  assert.deepEqual(JSON.parse(setup.stdout), installed);
+
+  if (process.env.GHERILA_TEST_NATIVE === '1') {
+    const build = join(directory, 'build');
+    await exec('cmake', ['-S', join(root, 'examples/languages/native'), '-B', build], { timeout: 120000 });
+    await exec('cmake', ['--build', build, '--config', 'Release'], { timeout: 120000 });
+    const extension = process.platform === 'win32' ? '.exe' : '';
+    const rust = join(build, 'bin', 'gherila-rust' + extension);
+    await exec('rustc', [join(root, 'examples/languages/example.rs'), '-o', rust], { timeout: 120000 });
+    const portable = join(directory, 'portable runtime ü');
+    await cp(runtime, portable, { recursive: true });
+    const nativeEnv = { ...process.env, ...offline,
+      GHERILA_LAUNCHER: join(portable, process.platform === 'win32' ? 'gherila.ps1' : 'gherila.sh') };
+    for (const name of ['gherila-c', 'gherila-cpp', 'gherila-rust']) {
+      const program = join(build, 'bin', name + extension);
+      const result = await exec(program, ['install'], { cwd: directory, env: nativeEnv, timeout: 30000 });
+      assert.deepEqual(JSON.parse(result.stdout), installed, name + ' install');
+      const described = await exec(program, ['--describe'], { cwd: directory, env: nativeEnv, timeout: 30000 });
+      assert.equal(JSON.parse(described.stdout).protocol, 1, name + ' discovery');
+      const response = exec(program, [], { cwd: directory, env: nativeEnv, timeout: 30000 });
+      response.child.stdin.end('{"id":"native","op":"describe"}\n');
+      const envelope = JSON.parse((await response).stdout);
+      assert.equal(envelope.id, 'native');
+      assert.equal(envelope.result.protocol, 1);
+      assert.equal(Object.keys(envelope.result.platforms).length, 7);
+      const empty = await mkdtemp(join(directory, 'offline-'));
+      await assert.rejects(exec(program, ['install'], {
+        cwd: directory, env: { ...nativeEnv, GHERILA_CACHE_DIR: empty }, timeout: 30000,
+      }), error => error.code !== 0 && !error.stdout.trim() && /first setup needs internet/.test(error.stderr));
+    }
+  }
   await rm(directory, { recursive: true, force: true });
 });

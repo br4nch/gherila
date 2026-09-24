@@ -6,6 +6,41 @@ Other languages can launch it using their normal process API and exchange the
 same [JSON requests](../docs/bridge.md). All provider methods run the same Python
 implementation with the same arguments and results.
 
+## Install from any language
+
+Use your language's subprocess API to run the following command and wait for its
+exit status. It needs no existing Python or Node installation.
+
+```sh
+sh runtime/gherila.sh install
+```
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File runtime/gherila.ps1 install
+```
+
+`install` prepares Python, Gherila and every Python dependency, then prints one
+UTF-8 JSON object and exits successfully without waiting for stdin:
+
+```json
+{"python":"/absolute/path/to/private/python","args":["-I","-X","utf8","-u","-m","gherila"],"protocol":1}
+```
+
+The path is specific to the host. Spawn `python` with the returned `args` array
+to start the worker, or call the launcher normally. Pass arguments as an array
+instead of constructing a shell command string. Installation errors go to stderr
+and produce a nonzero exit status; stdout is reserved for a successful report.
+Repeated installation reuses the completed environment, including offline.
+
+JavaScript/TypeScript exposes `await install()` and `gherila-runtime install`,
+and runs this setup from its npm install hook when lifecycle scripts are enabled.
+The [other language examples](../examples/languages/README.md) expose the same
+`install` operation. C/C++ applications can call `gherila_install(NULL)` from
+the [shared header](../bindings/c/README.md). These are local entry points included
+in the repository, not separately published Cargo, NuGet, RubyGems or Go packages.
+
+## Run the worker
+
 Linux/macOS:
 
 ```sh
@@ -49,7 +84,7 @@ still prevent execution.
 | Windows default | `%LOCALAPPDATA%\gherila` |
 | `GHERILA_CACHE_DIR` | Override the cache directory |
 | `GHERILA_OFFLINE=1` | Require cached setup; fail clearly if runtime files are missing |
-| `GHERILA_PYTHON` | Clients/examples use this preconfigured executable and skip setup |
+| `GHERILA_PYTHON` | JS/Go/Java/C#/PHP/Ruby calls use this preconfigured executable; explicit install still prepares the private runtime |
 | `GHERILA_LAUNCHER` | Non-JavaScript examples use this relocated launcher path |
 
 Cached launchers can start without internet, but fetching platform data still
@@ -76,6 +111,7 @@ Ship that directory with your integration and launch `gherila.sh` or `gherila.ps
 Node is used only by this packaging helper, not by the launcher or by Go, Java,
 C#, PHP or Ruby applications. `npm pack` runs this bundling step automatically
 for the JavaScript client. The repository checkout works directly too.
+Include the C header as well when distributing a C or C++ integration.
 
 uv uses Python builds from [python-build-standalone](https://docs.astral.sh/uv/guides/install-python/).
 The pinned uv archives and their hashes are available in the

@@ -4,6 +4,23 @@ export type Platform = 'brave' | 'github' | 'instagram' | 'reddit' | 'snapchat' 
 export type Value = null | boolean | number | bigint | string | Uint8Array | Value[] | { [key: string]: Value };
 export type Fields = { [key: string]: Value };
 export type Model = { [key: string]: Value };
+export interface InstallOptions {
+  cwd?: string;
+  env?: Record<string, string>;
+  /** Setup timeout in milliseconds. Default: 300000. */
+  timeout?: number;
+  /** Cancels setup and its child processes. */
+  signal?: AbortSignal;
+}
+export interface Installation {
+  /** Absolute path to the prepared private Python executable. */
+  python: string;
+  /** Arguments for starting the JSON worker using this executable. */
+  args: string[];
+  protocol: 1;
+}
+/** Prepare private Python, Gherila and all dependencies without starting a worker. */
+export function install(options?: InstallOptions): Promise<Installation>;
 export interface Options {
   /** Use an existing Python with Gherila installed; bypasses automatic setup. */
   python?: string;

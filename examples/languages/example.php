@@ -1,7 +1,9 @@
 <?php
 // PHP 7.4+ supports argument arrays, avoiding shell quoting on every OS.
+$installing = array_slice($argv, 1) === ['install'];
+if ($argc > 1 && !$installing) { fwrite(STDERR, "Expected install or no arguments.\n"); exit(2); }
 $python = getenv('GHERILA_PYTHON');
-if ($python) {
+if (!$installing && $python) {
   $command = [$python, '-u', '-m', 'gherila'];
 } elseif (PHP_OS_FAMILY === 'Windows') {
   $command = ['powershell.exe', '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
@@ -9,6 +11,7 @@ if ($python) {
 } else {
   $command = ['/bin/sh', getenv('GHERILA_LAUNCHER') ?: __DIR__ . '/../../runtime/gherila.sh'];
 }
+if ($installing) { $command[] = 'install'; }
 $request = getenv('GHERILA_REQUEST') ?: json_encode([
   'id' => 'example', 'platform' => 'github', 'method' => 'get_user',
   'kwargs' => ['username' => 'octocat'],
@@ -18,7 +21,7 @@ $process = proc_open($command, [
 ], $pipes);
 if (!is_resource($process)) { throw new RuntimeException('Could not start Gherila.'); }
 try {
-  $line = $request . "\n";
+  $line = $installing ? '' : $request . "\n";
   for ($offset = 0; $offset < strlen($line); $offset += $written) {
     $written = fwrite($pipes[0], substr($line, $offset));
     if ($written === false || $written === 0) { throw new RuntimeException('Could not write the request.'); }
@@ -36,4 +39,4 @@ if (array_key_exists('error', $response)) {
   fwrite(STDERR, json_encode($response['error'], JSON_THROW_ON_ERROR) . "\n");
   exit(1);
 }
-echo json_encode($response['result'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE) . "\n";
+echo json_encode($installing ? $response : $response['result'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE) . "\n";

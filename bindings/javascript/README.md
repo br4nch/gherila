@@ -1,7 +1,7 @@
 # Gherila for JavaScript and TypeScript
 
 This client calls Gherila's existing providers through a local worker. Install
-the client; Python and Gherila are set up automatically on the first call:
+the client; its npm install hook automatically prepares Python, Gherila and dependencies:
 
 ```sh
 npm install ./bindings/javascript
@@ -11,6 +11,33 @@ This package is included in the repository; it has not been published to npm.
 Node 18+ is required. TypeScript projects also need `@types/node`. The npm package
 includes the matching Python source; automatic setup installs it with private
 Python 3.13, without relying on the current PyPI release.
+
+To explicitly install or prepare the runtime from either JavaScript or TypeScript:
+
+```js
+import { install } from '@gherila/client';
+
+const runtime = await install();
+// { python: '/absolute/private/python', args: ['-I', '-X', 'utf8', '-u', '-m', 'gherila'], protocol: 1 }
+```
+
+Or run the package's command after installing it:
+
+```sh
+npx --no-install gherila-runtime install
+```
+
+All three entry points use the same installer. They finish only after Python,
+Gherila and its dependencies are ready. Repeated installs reuse the cache and
+do not start a persistent worker. `install({ env, cwd, timeout, signal })` supports
+a custom environment, working directory, timeout in milliseconds (default 300000)
+and an `AbortSignal`. Failures reject the promise or exit the CLI with a nonzero
+status. The CLI prints one JSON report to stdout and setup messages to stderr.
+
+If npm install scripts are disabled or require approval under your package manager's
+policy, use the explicit command/function. Automatic first use also remains available.
+`install()` always prepares the managed runtime; `GHERILA_PYTHON` only overrides
+the interpreter used by ordinary client calls.
 
 ```js
 import { Gherila } from '@gherila/client';

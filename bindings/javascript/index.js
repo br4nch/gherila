@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { prepareRuntime } from './runtime.js';
+import { install } from './runtime.js';
+
+export { install };
 
 export class GherilaError extends Error {
   constructor({ code, message, type }) {
@@ -78,7 +80,7 @@ export class Gherila {
     const childEnv = { ...process.env, ...env, PYTHONIOENCODING: 'utf-8' };
     const managed = !python && autoInstall;
     if (managed) {
-      python = await prepareRuntime({ env: childEnv, cwd, timeout: setupTimeout, signal: this.#setup.signal });
+      python = (await install({ env: childEnv, cwd, timeout: setupTimeout, signal: this.#setup.signal })).python;
       pythonArgs = ['-I', '-X', 'utf8', ...pythonArgs];
     }
     python ||= process.platform === 'win32' ? 'python' : 'python3';

@@ -195,6 +195,23 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ProcessTests(unittest.TestCase):
+  def test_install_report_exits_without_waiting_for_stdin(self):
+    with subprocess.Popen([sys.executable, "-m", "gherila", "install"],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+      try:
+        self.assertEqual(process.wait(timeout=10), 0)
+        report = json.loads(process.stdout.read())
+        self.assertEqual(report["python"], sys.executable)
+        self.assertEqual(report["protocol"], 1)
+        # The returned command really starts the existing worker interface.
+        result = subprocess.run([report["python"], *report["args"], "--describe"],
+          capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(json.loads(result.stdout)["platforms"]), 7)
+      finally:
+        if process.poll() is None:
+          process.kill()
+
   def test_real_process_utf8_stderr_and_eof(self):
     requests = '\n'.join(json.dumps({"id": name, "platform": "github", "method": "get_user",
       "args": [name]}) for name in ["demo", "print", "slow"]).encode()

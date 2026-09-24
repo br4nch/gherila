@@ -259,6 +259,8 @@ async def run(input_stream, output_stream, *, concurrency=8, timeout=60, max_lin
 
 def main():
   parser = ArgumentParser(description=__doc__)
+  parser.add_argument("command", nargs="?", choices=["install"],
+    help="After launcher setup, print the ready runtime as JSON and exit without reading stdin.")
   parser.add_argument("--describe", action="store_true", help="Print the available providers and method signatures, then exit.")
   parser.add_argument("--concurrency", type=int, default=8, help="Maximum simultaneous calls (default: 8).")
   parser.add_argument("--timeout", type=float, default=60, help="Timeout per provider call in seconds (default: 60).")
@@ -266,6 +268,14 @@ def main():
   if args.concurrency < 1 or not math.isfinite(args.timeout) or args.timeout <= 0:
     parser.error("concurrency and timeout must be positive finite numbers")
   output = sys.stdout.buffer
+  if args.command == "install":
+    # The OS launcher provisions Python and dependencies before reaching here.
+    # One shared report keeps every language's installer contract identical.
+    output.write((json.dumps({"python": sys.executable,
+      "args": ["-I", "-X", "utf8", "-u", "-m", "gherila"], "protocol": 1},
+      ensure_ascii=False) + "\n").encode("utf-8"))
+    output.flush()
+    return
   if args.describe:
     output.write((json.dumps(describe(), ensure_ascii=False) + "\n").encode("utf-8"))
     output.flush()
