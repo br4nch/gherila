@@ -7,6 +7,13 @@ $core = Join-Path $PSScriptRoot 'core'
 if (!(Test-Path (Join-Path $core 'pyproject.toml'))) { $core = Split-Path $PSScriptRoot -Parent }
 if (!(Test-Path (Join-Path $core 'gherila/bridge.py'))) { throw 'Gherila: bundled Python core is missing.' }
 
+function Get-Sha256([string]$Path) {
+  $algorithm = [Security.Cryptography.SHA256]::Create()
+  $stream = [IO.File]::OpenRead($Path)
+  try { [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() }
+  finally { $stream.Dispose(); $algorithm.Dispose() }
+}
+
 $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
 $arch = switch ($arch.ToUpperInvariant()) {
   'AMD64' { 'x86_64' }
@@ -21,7 +28,7 @@ $version = (Get-Content (Join-Path $PSScriptRoot 'uv-version') -Raw).Trim()
 $files = @('pyproject.toml', 'setup.py', 'requirements.txt') | ForEach-Object { Join-Path $core $_ }
 $files += @(Get-ChildItem (Join-Path $core 'gherila/*.py') | Sort-Object Name | ForEach-Object { $_.FullName })
 $files += @('gherila.ps1', 'uv-version', 'uv-checksums.txt') | ForEach-Object { Join-Path $PSScriptRoot $_ }
-$hashes = ($files | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }) -join "`n"
+$hashes = ($files | ForEach-Object { Get-Sha256 $_ }) -join "`n"
 $sha = [System.Security.Cryptography.SHA256]::Create()
 try { $key = [BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($hashes))).Replace('-', '').ToLowerInvariant() }
 finally { $sha.Dispose() }
@@ -44,9 +51,18 @@ if (!$python -or !(Test-Path $python)) {
       [Console]::Error.WriteLine('Gherila: preparing a private Python runtime (first use).')
       [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
       $zip = Join-Path $temp 'uv.zip'
-      Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/astral-sh/uv/releases/download/$version/$archive" -OutFile $zip -TimeoutSec 180
-      if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne $expected) { throw 'Gherila: runtime checksum mismatch; download was not executed.' }
-      Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $temp 'uv')
+      # Use .NET directly: Windows PowerShell can inherit a PSModulePath from
+      # PowerShell 7 that does not contain its hashing/web/archive cmdlets.
+      $null = [Reflection.Assembly]::LoadWithPartialName('System.Net.Http')
+      $web = [Net.Http.HttpClient]::new()
+      $web.Timeout = [TimeSpan]::FromSeconds(180)
+      try {
+        $download = $web.GetByteArrayAsync("https://github.com/astral-sh/uv/releases/download/$version/$archive")
+        [IO.File]::WriteAllBytes($zip, $download.GetAwaiter().GetResult())
+      } finally { $web.Dispose() }
+      if ((Get-Sha256 $zip) -ne $expected) { throw 'Gherila: runtime checksum mismatch; download was not executed.' }
+      $null = [Reflection.Assembly]::LoadWithPartialName('System.IO.Compression.FileSystem')
+      [IO.Compression.ZipFile]::ExtractToDirectory($zip, (Join-Path $temp 'uv'))
       $binary = Get-ChildItem (Join-Path $temp 'uv') -Filter uv.exe -Recurse | Select-Object -First 1
       if (!$binary) { throw 'Gherila: runtime archive is missing uv.exe.' }
       $null = New-Item -ItemType Directory -Force -Path $uvDir
